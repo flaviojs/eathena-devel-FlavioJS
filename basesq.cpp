@@ -330,7 +330,7 @@ void CSQLParameter::rebuild()
 			.timestampCol  ("time").defaultsTo("CURRENT_TIMESTAMP")	.table()
 			.textCol       ("ip",16).isVariable().isNotNull()		.table()
 			.textCol       ("user",24).isVariable().isNotNull()		.table()
-			.intCol<uint32>("rcode",3).isNotNull()					.table()
+			.intCol        ("rcode",3,typemarker<uint32>()).isNotNull()					.table()
 			.textCol       ("log",100).isVariable().isNotNull()		.table()
 			.usingEngine(CSQLParameter::sql_engine);
 #endif
@@ -349,9 +349,9 @@ void CSQLParameter::rebuild()
 
 #ifdef DEVELOPING_CSQL
 		db.table(CSQLParameter::tbl_login_status)
-			.intCol<uint32>("index").isPrimary()				.table()
+			.intCol        ("index",typemarker<uint32>()).isPrimary()				.table()
 			.textCol       ("name",24).isVariable().isNotNull()	.table()
-			.intCol<uint32>("user").isNotNull()					.table()
+			.intCol        ("user",typemarker<uint32>()).isNotNull()					.table()
 			.usingEngine(CSQLParameter::sql_engine);
 #endif
 
@@ -382,20 +382,20 @@ void CSQLParameter::rebuild()
 
 #ifdef DEVELOPING_CSQL
 		CSQLTable<basics::CMySQLConnection> &tbl_account = db.table(CSQLParameter::tbl_account)
-			.intCol<uint32>("account_id").autoIncrements().isPrimary()					.table()
+			.intCol        ("account_id",typemarker<uint32>()).autoIncrements().isPrimary()					.table()
 			.textCol       ("user_id",24).isVariable().isNotNull().isIndexed()			.table()
 			.textCol       ("user_pass",34).isVariable().isNotNull()					.table()
 			.enumCol       ("sex").has("M").has("F").has("S").defaultsTo("M")			.table()
-			.intCol<uint32>("gm_level",3).isNotNull().defaultsTo(0)						.table()
+			.intCol        ("gm_level",3,typemarker<uint32>()).isNotNull().defaultsTo(0)						.table()
 			.bitCol        ("online",1).defaultsTo(0)									.table()
 			.textCol       ("email",40).isVariable().isNotNull().defaultsTo("a@a.com")	.table()
-			.intCol<uint32>("logins_id1").isNotNull().defaultsTo(0)						.table()
-			.intCol<uint32>("logins_id2").isNotNull().defaultsTo(0)						.table()
+			.intCol        ("logins_id1",typemarker<uint32>()).isNotNull().defaultsTo(0)						.table()
+			.intCol        ("logins_id2",typemarker<uint32>()).isNotNull().defaultsTo(0)						.table()
 			.textCol       ("client_ip",16).isVariable().isNotNull().defaultsTo("")		.table()
 			.textCol       ("last_login",24).isVariable().isNotNull().defaultsTo("")	.table()
-			.intCol<uint32>("login_count").isNotNull().defaultsTo(0)					.table()
-			.intCol<uint32>("ban_until").isNotNull().defaultsTo(0)						.table()
-			.intCol<uint32>("valid_until").isNotNull().defaultsTo(0)					.table()
+			.intCol        ("login_count",typemarker<uint32>()).isNotNull().defaultsTo(0)					.table()
+			.intCol        ("ban_until",typemarker<uint32>()).isNotNull().defaultsTo(0)						.table()
+			.intCol        ("valid_until",typemarker<uint32>()).isNotNull().defaultsTo(0)					.table()
 			.usingEngine(CSQLParameter::sql_engine)
 			.autoIncrementsFrom(start_account_num);
 #endif
@@ -533,53 +533,53 @@ void CSQLParameter::rebuild()
 
 #ifdef DEVELOPING_CSQL
 		CSQLTable<basics::CMySQLConnection> &tbl_char = db.table(CSQLParameter::tbl_char)
-			.intCol<uint32>("char_id").autoIncrements().isPrimary()								.table()
+			.intCol        ("char_id",typemarker<uint32>()).autoIncrements().isPrimary()								.table()
 			.referenceCol  (tbl_account["account_id"],CSQL_CASCADE,CSQL_CASCADE).defaultsTo(0)	.table()
-			.intCol<uint8> ("slot").isNotNull().defaultsTo(0)									.table()
+			.intCol        ("slot",typemarker<uint8>()).isNotNull().defaultsTo(0)									.table()
 			.textCol       ("name",24).isVariable().isNotNull().defaultsTo("").isIndexed()		.table()
-			.intCol<uint16>("class").isNotNull().defaultsTo(0)									.table()
-			.intCol<uint16>("base_level").isNotNull().defaultsTo(1)								.table()
-			.intCol<uint16>("job_level").isNotNull().defaultsTo(1)								.table()
-			.intCol<uint64>("base_exp").isNotNull().defaultsTo(0)								.table()
-			.intCol<uint64>("job_exp").isNotNull().defaultsTo(0)								.table()
-			.intCol<uint64>("zeny").isNotNull().defaultsTo(0)									.table()
-			.intCol<uint16>("str").isNotNull().defaultsTo(0)									.table()
-			.intCol<uint16>("agi").isNotNull().defaultsTo(0)									.table()
-			.intCol<uint16>("vit").isNotNull().defaultsTo(0)									.table()
-			.intCol<uint16>("int").isNotNull().defaultsTo(0)									.table()
-			.intCol<uint16>("dex").isNotNull().defaultsTo(0)									.table()
-			.intCol<uint16>("luk").isNotNull().defaultsTo(0)									.table()
-			.intCol<uint32>("max_hp").isNotNull().defaultsTo(0)									.table()
-			.intCol<uint32>("hp").isNotNull().defaultsTo(0)										.table()
-			.intCol<uint32>("max_sp").isNotNull().defaultsTo(0)									.table()
-			.intCol<uint32>("sp").isNotNull().defaultsTo(0)										.table()
-			.intCol<uint16>("status_point").isNotNull().defaultsTo(0)							.table()
-			.intCol<uint16>("skill_point").isNotNull().defaultsTo(0)							.table()
-			.intCol<int16> ("option").isNotNull().defaultsTo(0)									.table()
-			.intCol<int8>  ("karma").isNotNull().defaultsTo(0)									.table()
-			.intCol<int8>  ("chaos").isNotNull().defaultsTo(0)									.table()
-			.intCol<int16> ("manner").isNotNull().defaultsTo(0)									.table()
-			.intCol<uint32>("party_id").isNotNull().defaultsTo(0).isIndexed()					.table()
-			.intCol<uint32>("guild_id").isNotNull().defaultsTo(0).isIndexed()					.table()
-			.intCol<uint32>("pet_id").isNotNull().defaultsTo(0)									.table()
-			.intCol<uint16>("hair").isNotNull().defaultsTo(0)									.table()
-			.intCol<uint16>("hair_color").isNotNull().defaultsTo(0)								.table()
-			.intCol<uint16>("clothes_color").isNotNull().defaultsTo(0)							.table()
-			.intCol<uint16>("weapon").isNotNull().defaultsTo(1)									.table()
-			.intCol<uint16>("shield").isNotNull().defaultsTo(0)									.table()
-			.intCol<uint16>("head_top").isNotNull().defaultsTo(0)								.table()
-			.intCol<uint16>("head_mid").isNotNull().defaultsTo(0)								.table()
-			.intCol<uint16>("head_bottom").isNotNull().defaultsTo(0)							.table()
+			.intCol        ("class",typemarker<uint16>()).isNotNull().defaultsTo(0)									.table()
+			.intCol        ("base_level",typemarker<uint16>()).isNotNull().defaultsTo(1)								.table()
+			.intCol        ("job_level",typemarker<uint16>()).isNotNull().defaultsTo(1)								.table()
+			.intCol        ("base_exp",typemarker<uint64>()).isNotNull().defaultsTo(0)								.table()
+			.intCol        ("job_exp",typemarker<uint64>()).isNotNull().defaultsTo(0)								.table()
+			.intCol        ("zeny",typemarker<uint64>()).isNotNull().defaultsTo(0)									.table()
+			.intCol        ("str",typemarker<uint16>()).isNotNull().defaultsTo(0)									.table()
+			.intCol        ("agi",typemarker<uint16>()).isNotNull().defaultsTo(0)									.table()
+			.intCol        ("vit",typemarker<uint16>()).isNotNull().defaultsTo(0)									.table()
+			.intCol        ("int",typemarker<uint16>()).isNotNull().defaultsTo(0)									.table()
+			.intCol        ("dex",typemarker<uint16>()).isNotNull().defaultsTo(0)									.table()
+			.intCol        ("luk",typemarker<uint16>()).isNotNull().defaultsTo(0)									.table()
+			.intCol        ("max_hp",typemarker<uint32>()).isNotNull().defaultsTo(0)									.table()
+			.intCol        ("hp",typemarker<uint32>()).isNotNull().defaultsTo(0)										.table()
+			.intCol        ("max_sp",typemarker<uint32>()).isNotNull().defaultsTo(0)									.table()
+			.intCol        ("sp",typemarker<uint32>()).isNotNull().defaultsTo(0)										.table()
+			.intCol        ("status_point",typemarker<uint16>()).isNotNull().defaultsTo(0)							.table()
+			.intCol        ("skill_point",typemarker<uint16>()).isNotNull().defaultsTo(0)							.table()
+			.intCol        ("option",typemarker<int16>()).isNotNull().defaultsTo(0)									.table()
+			.intCol        ("karma",typemarker<uint8>()).isNotNull().defaultsTo(0)									.table()
+			.intCol        ("chaos",typemarker<uint8>()).isNotNull().defaultsTo(0)									.table()
+			.intCol        ("manner",typemarker<int16>()).isNotNull().defaultsTo(0)									.table()
+			.intCol        ("party_id",typemarker<uint32>()).isNotNull().defaultsTo(0).isIndexed()					.table()
+			.intCol        ("guild_id",typemarker<uint32>()).isNotNull().defaultsTo(0).isIndexed()					.table()
+			.intCol        ("pet_id",typemarker<uint32>()).isNotNull().defaultsTo(0)									.table()
+			.intCol        ("hair",typemarker<uint16>()).isNotNull().defaultsTo(0)									.table()
+			.intCol        ("hair_color",typemarker<uint16>()).isNotNull().defaultsTo(0)								.table()
+			.intCol        ("clothes_color",typemarker<uint16>()).isNotNull().defaultsTo(0)							.table()
+			.intCol        ("weapon",typemarker<uint16>()).isNotNull().defaultsTo(1)									.table()
+			.intCol        ("shield",typemarker<uint16>()).isNotNull().defaultsTo(0)									.table()
+			.intCol        ("head_top",typemarker<uint16>()).isNotNull().defaultsTo(0)								.table()
+			.intCol        ("head_mid",typemarker<uint16>()).isNotNull().defaultsTo(0)								.table()
+			.intCol        ("head_bottom",typemarker<uint16>()).isNotNull().defaultsTo(0)							.table()
 			.textCol       ("last_map",20).isVariable().isNotNull().defaultsTo("new_5-1")		.table()
-			.intCol<uint16>("last_x").isNotNull().defaultsTo(53)								.table()
-			.intCol<uint16>("last_y").isNotNull().defaultsTo(111)								.table()
+			.intCol        ("last_x",typemarker<uint16>()).isNotNull().defaultsTo(53)								.table()
+			.intCol        ("last_y",typemarker<uint16>()).isNotNull().defaultsTo(111)								.table()
 			.textCol       ("save_map",20).isVariable().isNotNull().defaultsTo("new_5-1")		.table()
-			.intCol<uint16>("save_x").isNotNull().defaultsTo(53)								.table()
-			.intCol<uint16>("save_y").isNotNull().defaultsTo(111)								.table()
-			.intCol<uint32>("partner_id").isNotNull().defaultsTo(0)								.table()
-			.intCol<uint32>("mother_id").isNotNull().defaultsTo(0)								.table()
-			.intCol<uint32>("child_id").isNotNull().defaultsTo(0)								.table()
-			.intCol<uint32>("fame_points").isNotNull().defaultsTo(0)							.table()
+			.intCol        ("save_x",typemarker<uint16>()).isNotNull().defaultsTo(53)								.table()
+			.intCol        ("save_y",typemarker<uint16>()).isNotNull().defaultsTo(111)								.table()
+			.intCol        ("partner_id",typemarker<uint32>()).isNotNull().defaultsTo(0)								.table()
+			.intCol        ("mother_id",typemarker<uint32>()).isNotNull().defaultsTo(0)								.table()
+			.intCol        ("child_id",typemarker<uint32>()).isNotNull().defaultsTo(0)								.table()
+			.intCol        ("fame_points",typemarker<uint32>()).isNotNull().defaultsTo(0)							.table()
 			.bitCol        ("online",1).isNotNull().defaultsTo(0)								.table()
 			.usingEngine(CSQLParameter::sql_engine)
 			.autoIncrementsFrom(start_account_num);
@@ -664,16 +664,16 @@ void CSQLParameter::rebuild()
 #ifdef DEVELOPING_CSQL
 		db.table(CSQLParameter::tbl_inventory)
 			.referenceCol  (tbl_char["char_id"],CSQL_CASCADE,CSQL_CASCADE).defaultsTo(0)	.table()
-			.intCol<uint16>("nameid").isNotNull().defaultsTo(0)								.table()
-			.intCol<uint16>("equip").isNotNull().defaultsTo(0)								.table()
-			.intCol<uint32>("amount").isNotNull().defaultsTo(0)								.table()
-			.intCol<uint8> ("refine",2).isNotNull().defaultsTo(0)							.table()
-			.intCol<uint8> ("attribute").isNotNull().defaultsTo(0)							.table()
-			.intCol<uint8> ("identify").isNotNull().defaultsTo(1)							.table()
-			.intCol<uint16>("card0").isNotNull().defaultsTo(0)								.table()
-			.intCol<uint16>("card1").isNotNull().defaultsTo(0)								.table()
-			.intCol<uint16>("card2").isNotNull().defaultsTo(0)								.table()
-			.intCol<uint16>("card3").isNotNull().defaultsTo(0)								.table()
+			.intCol        ("nameid",typemarker<uint16>()).isNotNull().defaultsTo(0)								.table()
+			.intCol        ("equip",typemarker<uint16>()).isNotNull().defaultsTo(0)								.table()
+			.intCol        ("amount",typemarker<uint16>()).isNotNull().defaultsTo(0)								.table()
+			.intCol        ("refine",2,typemarker<uint8>()).isNotNull().defaultsTo(0)							.table()
+			.intCol        ("attribute",typemarker<uint8>()).isNotNull().defaultsTo(0)							.table()
+			.intCol        ("identify",typemarker<uint8>()).isNotNull().defaultsTo(1)							.table()
+			.intCol        ("card0",typemarker<uint16>()).isNotNull().defaultsTo(0)								.table()
+			.intCol        ("card1",typemarker<uint16>()).isNotNull().defaultsTo(0)								.table()
+			.intCol        ("card2",typemarker<uint16>()).isNotNull().defaultsTo(0)								.table()
+			.intCol        ("card3",typemarker<uint16>()).isNotNull().defaultsTo(0)								.table()
 			.usingEngine(CSQLParameter::sql_engine);
 #endif
 
@@ -700,7 +700,7 @@ void CSQLParameter::rebuild()
 #ifdef DEVELOPING_CSQL
 		db.table(CSQLParameter::tbl_cart)
 			.referenceCol  (tbl_char["char_id"],CSQL_CASCADE,CSQL_CASCADE).defaultsTo(0)	.table()
-			.intCol<uint16>("nameid").isNotNull().defaultsTo(0)								.table()
+/*			.intCol<uint16>("nameid").isNotNull().defaultsTo(0)								.table()
 			.intCol<uint16>("equip").isNotNull().defaultsTo(0)								.table()
 			.intCol<uint32>("amount").isNotNull().defaultsTo(0)								.table()
 			.intCol<uint8> ("refine",2).isNotNull().defaultsTo(0)							.table()
@@ -710,7 +710,7 @@ void CSQLParameter::rebuild()
 			.intCol<uint16>("card1").isNotNull().defaultsTo(0)								.table()
 			.intCol<uint16>("card2").isNotNull().defaultsTo(0)								.table()
 			.intCol<uint16>("card3").isNotNull().defaultsTo(0)								.table()
-			.usingEngine(CSQLParameter::sql_engine);
+*/			.usingEngine(CSQLParameter::sql_engine);
 #endif
 
 	///////////////////////////////////////////////////////////////////////////
@@ -730,9 +730,9 @@ void CSQLParameter::rebuild()
 		db.table(CSQLParameter::tbl_memo)
 			.referenceCol  (tbl_char["char_id"],CSQL_CASCADE,CSQL_CASCADE).defaultsTo(0)	.table()
 			.textCol       ("map",20).isVariable().isNotNull().defaultsTo("")				.table()
-			.intCol<uint16>("x").isNotNull().defaultsTo(0)									.table()
+/*			.intCol<uint16>("x").isNotNull().defaultsTo(0)									.table()
 			.intCol<uint16>("y").isNotNull().defaultsTo(0)									.table()
-			.usingEngine(CSQLParameter::sql_engine);
+*/			.usingEngine(CSQLParameter::sql_engine);
 #endif
 
 	///////////////////////////////////////////////////////////////////////////
@@ -751,9 +751,9 @@ void CSQLParameter::rebuild()
 #ifdef DEVELOPING_CSQL
 		db.table(CSQLParameter::tbl_skill)
 			.referenceCol  (tbl_char["char_id"],CSQL_CASCADE,CSQL_CASCADE).defaultsTo(0).isPrimary()	.table()
-			.intCol<uint16>("id").isNotNull().defaultsTo(0).isPrimary()									.table()
+/*			.intCol<uint16>("id").isNotNull().defaultsTo(0).isPrimary()									.table()
 			.intCol<uint16>("lv").isNotNull().defaultsTo(0)												.table()
-			.usingEngine(CSQLParameter::sql_engine);
+*/			.usingEngine(CSQLParameter::sql_engine);
 #endif
 
 	///////////////////////////////////////////////////////////////////////////
@@ -788,7 +788,7 @@ void CSQLParameter::rebuild()
 
 #ifdef DEVELOPING_CSQL
 		db.table(CSQLParameter::tbl_mail)
-			.intCol<uint32>("message_id").isNotNull().autoIncrements().isPrimary()						.table()
+/*			.intCol<uint32>("message_id").isNotNull().autoIncrements().isPrimary()						.table()
 			.referenceCol  ("to_char_id",tbl_char["char_id"],CSQL_CASCADE,CSQL_CASCADE).defaultsTo(0)	.table()
 			.textCol       ("to_char_name",24).isVariable().isNotNull().defaultsTo("")					.table()
 			.intCol<uint32>("from_char_id").isNotNull().defaultsTo(0)									.table()
@@ -808,7 +808,7 @@ void CSQLParameter::rebuild()
 			.intCol<uint16>("item_card1").isNotNull().defaultsTo(0)										.table()
 			.intCol<uint16>("item_card2").isNotNull().defaultsTo(0)										.table()
 			.intCol<uint16>("item_card3").isNotNull().defaultsTo(0)										.table()
-			.usingEngine(CSQLParameter::sql_engine)
+*/			.usingEngine(CSQLParameter::sql_engine)
 			.autoIncrementsFrom(1);
 #endif
 
@@ -836,7 +836,7 @@ void CSQLParameter::rebuild()
 #ifdef DEVELOPING_CSQL
 		db.table(CSQLParameter::tbl_storage)
 			.referenceCol  (tbl_account["account_id"],CSQL_CASCADE,CSQL_CASCADE).defaultsTo(0)	.table()
-			.intCol<uint16>("nameid").isNotNull().defaultsTo(0)									.table()
+/*			.intCol<uint16>("nameid").isNotNull().defaultsTo(0)									.table()
 			.intCol<uint16>("equip").isNotNull().defaultsTo(0)									.table()
 			.intCol<uint32>("amount").isNotNull().defaultsTo(0)									.table()
 			.intCol<uint8> ("refine").isNotNull().defaultsTo(0)									.table()
@@ -846,7 +846,7 @@ void CSQLParameter::rebuild()
 			.intCol<uint16>("card1").isNotNull().defaultsTo(0)									.table()
 			.intCol<uint16>("card2").isNotNull().defaultsTo(0)									.table()
 			.intCol<uint16>("card3").isNotNull().defaultsTo(0)									.table()
-			.usingEngine(CSQLParameter::sql_engine);
+*/			.usingEngine(CSQLParameter::sql_engine);
 
 #endif
 
@@ -878,7 +878,7 @@ void CSQLParameter::rebuild()
 
 #ifdef DEVELOPING_CSQL
 		CSQLTable<basics::CMySQLConnection> &tbl_guild = db.table(CSQLParameter::tbl_guild)
-			.intCol<uint32>("guild_id").isNotNull().autoIncrements().isPrimary()						.table()
+/*			.intCol<uint32>("guild_id").isNotNull().autoIncrements().isPrimary()						.table()
 			.intCol<uint16>("guild_lv").isNotNull().defaultsTo(0)										.table()
 			.intCol<uint16>("connect_member").isNotNull().defaultsTo(0)									.table()
 			.intCol<uint16>("max_member").isNotNull().defaultsTo(0)										.table()
@@ -893,7 +893,7 @@ void CSQLParameter::rebuild()
 			.intCol<uint32>("emblem_id").isNotNull().defaultsTo(0)										.table()
 			.intCol<uint16>("emblem_len").isNotNull().defaultsTo(0)										.table()
 			.byteCol       ("emblem_data").isNotNull()													.table()
-			.usingEngine(CSQLParameter::sql_engine)
+*/			.usingEngine(CSQLParameter::sql_engine)
 			.autoIncrementsFrom(start_guild_num);
 #endif
 
@@ -932,7 +932,7 @@ void CSQLParameter::rebuild()
 
 #ifdef DEVELOPING_CSQL
 		db.table(CSQLParameter::tbl_guild_storage)
-			.referenceCol  (tbl_guild["guild_id"],CSQL_CASCADE,CSQL_CASCADE).defaultsTo(0)	.table()
+/*			.referenceCol  (tbl_guild["guild_id"],CSQL_CASCADE,CSQL_CASCADE).defaultsTo(0)	.table()
 			.intCol<uint16>("nameid").isNotNull().defaultsTo(0)								.table()
 			.intCol<uint16>("equip").isNotNull().defaultsTo(0)								.table()
 			.intCol<uint32>("amount").isNotNull().defaultsTo(0)								.table()
@@ -943,7 +943,7 @@ void CSQLParameter::rebuild()
 			.intCol<uint16>("card1").isNotNull().defaultsTo(0)								.table()
 			.intCol<uint16>("card2").isNotNull().defaultsTo(0)								.table()
 			.intCol<uint16>("card3").isNotNull().defaultsTo(0)								.table()
-			.usingEngine(CSQLParameter::sql_engine);
+*/			.usingEngine(CSQLParameter::sql_engine);
 #endif
 
 	///////////////////////////////////////////////////////////////////////////
@@ -969,12 +969,12 @@ void CSQLParameter::rebuild()
 		db.table(CSQLParameter::tbl_guild_member)
 			.referenceCol  (tbl_char["char_id"],CSQL_CASCADE,CSQL_CASCADE).defaultsTo(0).isPrimary()	.table()
 			.referenceCol  (tbl_guild["guild_id"],CSQL_CASCADE,CSQL_CASCADE).defaultsTo(0).isPrimary()	.table()
-			.intCol<uint32>("exp").isNotNull().defaultsTo(0)											.table()
+/*			.intCol<uint32>("exp").isNotNull().defaultsTo(0)											.table()
 			.intCol<uint32>("exp_payper").isNotNull().defaultsTo(0)										.table()
 			.intCol<uint16>("position").isNotNull().defaultsTo(0)										.table()
 			.intCol<uint32>("rsv1").isNotNull().defaultsTo(0)											.table()
 			.intCol<uint32>("rsv2").isNotNull().defaultsTo(0)											.table()
-			.usingEngine(CSQLParameter::sql_engine);
+*/			.usingEngine(CSQLParameter::sql_engine);
 #endif
 
 	///////////////////////////////////////////////////////////////////////////
@@ -994,9 +994,9 @@ void CSQLParameter::rebuild()
 #ifdef DEVELOPING_CSQL
 		db.table(CSQLParameter::tbl_guild_skill)
 			.referenceCol  (tbl_guild["guild_id"],CSQL_CASCADE,CSQL_CASCADE).defaultsTo(0).isPrimary()	.table()
-			.intCol<uint16>("id").isNotNull().defaultsTo(0).isPrimary()									.table()
+/*			.intCol<uint16>("id").isNotNull().defaultsTo(0).isPrimary()									.table()
 			.intCol<uint16>("lv").isNotNull().defaultsTo(0)												.table()
-			.usingEngine(CSQLParameter::sql_engine);
+*/			.usingEngine(CSQLParameter::sql_engine);
 #endif
 	///////////////////////////////////////////////////////////////////////////
 	query << "CREATE TABLE IF NOT EXISTS `" << dbcon1.escaped(CSQLParameter::tbl_guild_position) << "` "
@@ -1017,11 +1017,11 @@ void CSQLParameter::rebuild()
 #ifdef DEVELOPING_CSQL
 		db.table(CSQLParameter::tbl_guild_position)
 			.referenceCol  (tbl_guild["guild_id"],CSQL_CASCADE,CSQL_CASCADE).defaultsTo(0).isPrimary()	.table()
-			.intCol<uint16>("position").isNotNull().defaultsTo(0).isPrimary()					.table()
+/*			.intCol<uint16>("position").isNotNull().defaultsTo(0).isPrimary()					.table()
 			.textCol       ("name",24).isVariable().isNotNull().defaultsTo("")					.table()
 			.intCol<uint32>("mode").isNotNull().defaultsTo(0)									.table()
 			.intCol<uint32>("exp_mode").isNotNull().defaultsTo(0)								.table()
-			.usingEngine(CSQLParameter::sql_engine);
+*/			.usingEngine(CSQLParameter::sql_engine);
 #endif
 
 	///////////////////////////////////////////////////////////////////////////
@@ -1043,7 +1043,7 @@ void CSQLParameter::rebuild()
 		db.table(CSQLParameter::tbl_guild_alliance)
 			.referenceCol  (tbl_guild["guild_id"],CSQL_CASCADE,CSQL_CASCADE).defaultsTo(0).isPrimary()					.table()
 			.referenceCol  ("alliance_id",tbl_guild["guild_id"],CSQL_CASCADE,CSQL_CASCADE).defaultsTo(0).isPrimary()	.table()
-			.intCol<uint32>("opposition").isNotNull().defaultsTo(0)														.table()
+//			.intCol<uint32>("opposition").isNotNull().defaultsTo(0)														.table()
 			.usingEngine(CSQLParameter::sql_engine);
 #endif
 
@@ -1072,10 +1072,10 @@ void CSQLParameter::rebuild()
 			.referenceCol  (tbl_char["char_id"],CSQL_CASCADE,CSQL_CASCADE).defaultsTo(0).isPrimary()	.table()
 			.textCol       ("mes",40).isVariable().isNotNull().defaultsTo("")							.table()
 			.textCol       ("acc",40).isVariable().isNotNull().defaultsTo("")							.table()
-			.intCol<uint32>("rsv1").isNotNull().defaultsTo(0)											.table()
+/*			.intCol<uint32>("rsv1").isNotNull().defaultsTo(0)											.table()
 			.intCol<uint32>("rsv2").isNotNull().defaultsTo(0)											.table()
 			.intCol<uint32>("rsv3").isNotNull().defaultsTo(0)											.table()
-			.usingEngine(CSQLParameter::sql_engine);
+*/			.usingEngine(CSQLParameter::sql_engine);
 #endif
 
 	///////////////////////////////////////////////////////////////////////////
@@ -1100,7 +1100,7 @@ void CSQLParameter::rebuild()
 
 #ifdef DEVELOPING_CSQL
 		CSQLTable<basics::CMySQLConnection> &tbl_castle = db.table(CSQLParameter::tbl_castle)
-			.intCol<uint16>("castle_id").isNotNull().defaultsTo(0).isPrimary()				.table()
+/*			.intCol<uint16>("castle_id").isNotNull().defaultsTo(0).isPrimary()				.table()
 			.referenceCol  (tbl_guild["guild_id"],CSQL_CASCADE,CSQL_CASCADE).defaultsTo(0)	.table()
 			.intCol<uint32>("economy").isNotNull().defaultsTo(0)							.table()
 			.intCol<uint32>("defense").isNotNull().defaultsTo(0)							.table()
@@ -1110,7 +1110,7 @@ void CSQLParameter::rebuild()
 			.intCol<uint32>("payTime").isNotNull().defaultsTo(0)							.table()
 			.intCol<uint32>("createTime").isNotNull().defaultsTo(0)							.table()
 			.intCol<uint32>("visibleC").isNotNull().defaultsTo(0)							.table()
-			.usingEngine(CSQLParameter::sql_engine);
+*/			.usingEngine(CSQLParameter::sql_engine);
 #endif
 
 	///////////////////////////////////////////////////////////////////////////
@@ -1130,9 +1130,9 @@ void CSQLParameter::rebuild()
 #ifdef DEVELOPING_CSQL
 		db.table(CSQLParameter::tbl_castle_guardian)
 			.referenceCol  (tbl_castle["castle_id"],CSQL_CASCADE,CSQL_CASCADE).isPrimary()	.table()
-			.intCol<uint32>("guardian_id").isNotNull().defaultsTo(0).isPrimary()			.table()
+/*			.intCol<uint32>("guardian_id").isNotNull().defaultsTo(0).isPrimary()			.table()
 			.intCol<uint32>("guardian_hp").isNotNull().defaultsTo(0)						.table()
-			.bitCol        ("guardian_visible",1).isNotNull().defaultsTo(0)					.table()
+*/			.bitCol        ("guardian_visible",1).isNotNull().defaultsTo(0)					.table()
 			.usingEngine(CSQLParameter::sql_engine);
 #endif
 
@@ -1156,13 +1156,13 @@ void CSQLParameter::rebuild()
 
 #ifdef DEVELOPING_CSQL
 		db.table(CSQLParameter::tbl_party)
-			.intCol<uint32>("party_id").isNotNull().autoIncrements().isPrimary()			.table()
+/*			.intCol<uint32>("party_id").isNotNull().autoIncrements().isPrimary()			.table()
 			.textCol       ("name",24).isVariable().isNotNull().isUnique().defaultsTo("")	.table()
 			.textCol       ("leader",24).isVariable().isNotNull().isUnique().defaultsTo("")	.table()
 			.intCol<uint16>("expshare").isNotNull().defaultsTo(0)							.table()
 			.intCol<uint16>("itemshare").isNotNull().defaultsTo(0)							.table()
 			.intCol<uint16>("itemc").isNotNull().defaultsTo(0)								.table()
-			.usingEngine(CSQLParameter::sql_engine);
+*/			.usingEngine(CSQLParameter::sql_engine);
 #endif
 
 	query << "INSERT INTO `" << dbcon1.escaped(CSQLParameter::tbl_party) << "` "
@@ -1201,7 +1201,7 @@ void CSQLParameter::rebuild()
 
 #ifdef DEVELOPING_CSQL
 		db.table(CSQLParameter::tbl_pet)
-			.intCol<uint32>("pet_id").isNotNull().autoIncrements().isPrimary()				.table()
+/*			.intCol<uint32>("pet_id").isNotNull().autoIncrements().isPrimary()				.table()
 			.referenceCol  (tbl_char["char_id"],CSQL_CASCADE,CSQL_CASCADE).defaultsTo(0)	.table()
 			.intCol<int16> ("class").isNotNull().defaultsTo(0)								.table()
 			.intCol<int16> ("level").isNotNull().defaultsTo(0)								.table()
@@ -1212,7 +1212,7 @@ void CSQLParameter::rebuild()
 			.textCol       ("name",24).isVariable().isNotNull().defaultsTo("")				.table()
 			.intCol<uint8> ("rename_flag").isNotNull().defaultsTo(0)						.table()
 			.intCol<uint8> ("incuvate").isNotNull().defaultsTo(0)							.table()//## "incuvate" -> "incubate" ?
-			.usingEngine(CSQLParameter::sql_engine)
+*/			.usingEngine(CSQLParameter::sql_engine)
 			.autoIncrementsFrom(start_pet_num);
 #endif
 
@@ -1274,7 +1274,7 @@ void CSQLParameter::rebuild()
 
 #ifdef DEVELOPING_CSQL
 		CSQLTable<basics::CMySQLConnection> &tbl_homunculus = db.table(CSQLParameter::tbl_homunculus)
-			.intCol<uint32>("hom_id").isNotNull().autoIncrements().isPrimary()					.table()
+/*			.intCol<uint32>("hom_id").isNotNull().autoIncrements().isPrimary()					.table()
 			.intCol<uint32>("account_id").isNotNull().defaultsTo(0)								.table()
 			.referenceCol  (tbl_char["char_id"],CSQL_CASCADE,CSQL_CASCADE).defaultsTo(0)		.table()
 
@@ -1307,7 +1307,7 @@ void CSQLParameter::rebuild()
 			.intCol<uint8> ("rename_flag").isNotNull().defaultsTo(0)							.table()
 			.intCol<uint8> ("incubate").isNotNull().defaultsTo(0)								.table()
 
-			.usingEngine(CSQLParameter::sql_engine)
+*/			.usingEngine(CSQLParameter::sql_engine)
 			.autoIncrementsFrom(start_homun_num);
 #endif
 
@@ -1338,9 +1338,9 @@ void CSQLParameter::rebuild()
 #ifdef DEVELOPING_CSQL
 		db.table(CSQLParameter::tbl_homunskill)
 			.referenceCol  (tbl_homunculus["homun_id"],CSQL_CASCADE,CSQL_CASCADE).defaultsTo(0).isPrimary()	.table()
-			.intCol<uint16>("id").isNotNull().defaultsTo(0).isPrimary()										.table()
+/*			.intCol<uint16>("id").isNotNull().defaultsTo(0).isPrimary()										.table()
 			.intCol<uint16>("lv").isNotNull().defaultsTo(0)													.table()
-			.usingEngine(CSQLParameter::sql_engine);
+*/			.usingEngine(CSQLParameter::sql_engine);
 #endif
 
 	///////////////////////////////////////////////////////////////////////////
@@ -1362,11 +1362,11 @@ void CSQLParameter::rebuild()
 #ifdef DEVELOPING_CSQL
 		db.table(CSQLParameter::tbl_homunskill)
 			.textCol       ("name",32).isVariable().isNotNull().defaultsTo(0).isPrimary().isIndexed()	.table()
-			.intCol<uint16>("stortype").isNotNull().defaultsTo(0).isPrimary()							.table()
+/*			.intCol<uint16>("stortype").isNotNull().defaultsTo(0).isPrimary()							.table()
 			.intCol<uint32>("storid").isNotNull().defaultsTo(0).isPrimary().isIndexed()					.table()
 			.intCol<uint16>("vartype").isNotNull().defaultsTo(0)										.table()
 			.intCol<uint16>("value").isNotNull().defaultsTo(0)											.table()
-			.usingEngine(CSQLParameter::sql_engine);
+*/			.usingEngine(CSQLParameter::sql_engine);
 #endif
 
 	///////////////////////////////////////////////////////////////////////

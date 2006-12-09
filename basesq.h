@@ -14,6 +14,12 @@
 #define DEVELOPING_CSQL
 #ifdef DEVELOPING_CSQL
 
+template <typename T>
+struct typemarker
+{
+	typedef T value_type;
+};
+
 template <typename CON> class CSQLReference;
 template <typename CON> class CSQLColumn;
 template <typename CON> class CSQLTable;
@@ -111,6 +117,7 @@ class CSQLReference
 	CSQLReference(CSQLTable<CON> &tbl, CSQLTable<CON> &target)
 		: tbl(tbl)
 		, target(target)
+		, from_(NULL)
 	{
 		onDel = CSQL_ACTIONUNDEFINED;
 		onUp = CSQL_ACTIONUNDEFINED;
@@ -457,7 +464,7 @@ class CSQLTable
 	const basics::string<> name;
 
 	/// Map of table columns.
-	basics::map< const basics::string<>, CSQLColumn<CON> * > cols;
+	basics::map<basics::string<>, CSQLColumn<CON> * > cols;
 
 	/// Vector of primary key columns.
 	basics::vector< CSQLColumn<CON> * > primary;
@@ -469,7 +476,7 @@ class CSQLTable
 	basics::string<> engine;
 
 	/// Auto-incrementable column. Only one per table.
-	struct {
+	struct _autoInc {
 		CSQLColumn<CON> *col;
 		basics::string<> start;
 	} autoInc;
@@ -489,7 +496,7 @@ class CSQLTable
 	~CSQLTable<CON>()
 	{
 		// delete columns
-		basics::map< const basics::string<>, CSQLColumn<CON> * >::iterator it(cols);
+		typename basics::map<basics::string<>, CSQLColumn<CON> * >::iterator it(cols);
 		for( ; it ; ++it )
 			delete it->data;
 		cols.clear();
@@ -583,14 +590,14 @@ public:
 	// Numeric types
 	CSQLColumn<CON> &bitCol(const basics::string<> &name, uint32 bits)		{ return insert(name,new CSQLColumn<CON>(*this,CSQL_BIT,name,bits)); }
 	template <typename TYPE>
-	CSQLColumn<CON> &intCol(const basics::string<> &name)
+	CSQLColumn<CON> &intCol(const basics::string<> &name, const typemarker<TYPE>&)
 	{
 		CSQLColumn<CON> &col = insert(name,new CSQLColumn<CON>(*this,CSQLIntCol<TYPE>::type(),name));
 		col.prop.numeric.unsigned_ = CSQLIntCol<TYPE>::isUnsigned();
 		return col;
 	}
 	template <typename TYPE>
-	CSQLColumn<CON> &intCol(const basics::string<> &name, uint32 digits)
+	CSQLColumn<CON> &intCol(const basics::string<> &name, uint32 digits, const typemarker<TYPE>&)
 	{
 		CSQLColumn<CON> &col = insert(name,new CSQLColumn<CON>(*this,CSQLIntCol<TYPE>::type(digits),name,digits));
 		col.prop.numeric.unsigned_ = CSQLIntCol<TYPE>::isUnsigned();
@@ -599,7 +606,7 @@ public:
 
 	// Floating-point types
 	template <typename X>
-	CSQLColumn<CON> &floatingPointCol(const basics::string<> &name); // [0,24] bits -> FLOAT , [25,53] bits -> DOUBLE
+	CSQLColumn<CON> &floatingPointCol(const basics::string<> &name, const typemarker<X>&); // [0,24] bits -> FLOAT , [25,53] bits -> DOUBLE
 	CSQLColumn<CON> &floatingPointCol(const basics::string<> &name, uint32 bits)					{ return insert(name,new CSQLColumn<CON>(*this,CSQL_FLOATING_POINT,name,bits)); }
 	CSQLColumn<CON> &floatingPointCol(const basics::string<> &name, uint32 digits, uint32 decimals)	{ return insert(name,new CSQLColumn<CON>(*this,CSQL_FLOATING_POINT,name,digits,decimals)); }
 
@@ -686,7 +693,7 @@ class CSQLDatabase
 	CON &con;
 
 	/// Map of database tables.
-	basics::map< const basics::string<>, CSQLTable<CON> * > tables;
+	basics::map< basics::string<>, CSQLTable<CON> * > tables;
 
 public:
 	///////////////////////////////////////////////////////////////////////////
@@ -700,7 +707,7 @@ public:
 	/// Deletes the tables.
 	~CSQLDatabase()
 	{
-		basics::map< const basics::string<>, CSQLTable<CON> * >::iterator it(tables);
+		typename basics::map< basics::string<>, CSQLTable<CON> * >::iterator it(tables);
 		for( ; it ; ++it )
 			delete it->data;
 		tables.clear();
