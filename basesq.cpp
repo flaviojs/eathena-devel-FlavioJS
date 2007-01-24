@@ -12,41 +12,161 @@
 #ifdef DEVELOPING_CSQL
 ///////////////////////////////////////////////////////////////////////////////
 // SQL database definition.
-//## TODO final validation of the database (on verify or rebuild)
-//## TODO indexes with multiple columns
-//## TODO recheck defaultsTo (when to quote and when not to...)
-//## TODO table function to set all fields NOT NULL (include future fields or just current ones?)
 
-// type of the integer column
-CSQLColumnType CSQLIntCol<int8>::type()		{ return CSQL_TINYINT; }
-CSQLColumnType CSQLIntCol<uint8>::type()	{ return CSQL_TINYINT; }
-CSQLColumnType CSQLIntCol<int16>::type()	{ return CSQL_SMALLINT; }
-CSQLColumnType CSQLIntCol<uint16>::type()	{ return CSQL_SMALLINT; }
-CSQLColumnType CSQLIntCol<int32>::type()	{ return CSQL_INT; }
-CSQLColumnType CSQLIntCol<uint32>::type()	{ return CSQL_INT; }
-CSQLColumnType CSQLIntCol<int64>::type()	{ return CSQL_BIGINT; }
-CSQLColumnType CSQLIntCol<uint64>::type()	{ return CSQL_BIGINT; }
+USING_NAMESPACE(sq)
 
-// if the column is unsigned
-bool CSQLIntCol<int8>::isUnsigned()		{ return false; }
-bool CSQLIntCol<int16>::isUnsigned()	{ return false; }
-bool CSQLIntCol<int32>::isUnsigned()	{ return false; }
-bool CSQLIntCol<int64>::isUnsigned()	{ return false; }
-bool CSQLIntCol<uint8>::isUnsigned()	{ return true; }
-bool CSQLIntCol<uint16>::isUnsigned()	{ return true; }
-bool CSQLIntCol<uint32>::isUnsigned()	{ return true; }
-bool CSQLIntCol<uint64>::isUnsigned()	{ return true; }
+///////////////////////////////////////////////////////////////////////////
+// Unique
 
-///////////////////////////////////////////////////////////////////////////////
-bool CSQLDatabase<basics::CMySQLConnection>::verify(void)
+Unique::Unique(void)
+{ }
+
+Unique::~Unique(void)
+{ }
+
+///////////////////////////////////////////////////////////////////////////
+// Index
+
+Index::Index(void)
+{ }
+
+Index::~Index(void)
+{ }
+
+///////////////////////////////////////////////////////////////////////////
+// Reference
+
+Reference::Reference(const basics::string<> &from, const basics::string<> &to, RefAction onDel, RefAction onUp, const basics::string<> &tbl)
+	: ref_from(from)
+	, ref_to(to)
+	, ref_onDel(onDel)
+	, ref_onUp(onUp)
+	, ref_tbl(tbl)
+{ }
+
+Reference::~Reference(void)
 {
-	return false;//## TODO
+	ref_from.clear();
+	ref_to.clear();
 }
 
-bool CSQLDatabase<basics::CMySQLConnection>::rebuild(void)
+inline const RefAction& Reference::onDel(void) const
 {
-	return false;//## TODO
+	return ref_onDel;
 }
+
+inline const RefAction& Reference::onUp(void) const
+{
+	return ref_onUp;
+}
+
+inline const basics::string<>& Reference::table(void) const
+{
+	return ref_tbl;
+}
+
+///////////////////////////////////////////////////////////////////////////
+// Property
+
+template< typename T >
+Property<T>::Property(void)
+{ }
+
+template< typename T >
+Property<T>::Property(const basics::string<>& name, const basics::string<>& value)
+	: prop_name(name)
+	, prop_value(value)
+{ }
+
+template< typename T >
+Property<T>::~Property(void)
+{ }
+
+template< typename T >
+inline const basics::string<>& Property<T>::name(void)
+{
+	return prop_name;
+}
+
+template< typename T >
+inline const basics::string<>& Property<T>::value(void)
+{
+	return prop_value;
+}
+
+///////////////////////////////////////////////////////////////////////////
+// AutoIncrements
+
+AutoIncrements::AutoIncrements(const uint32 from)
+	: inc_from(from)
+{ }
+
+AutoIncrements::~AutoIncrements(void)
+{ }
+
+inline const uint32 AutoIncrements::from(void) const
+{
+	return inc_from;
+}
+
+///////////////////////////////////////////////////////////////////////////
+// Default
+
+Default::Default(const uint32 value)
+	: def_value()
+{
+	def_value << value;
+}
+
+Default::Default(const basics::string<>& value)
+	: def_value(value)
+{ }
+
+Default::~Default(void)
+{ }
+
+inline const basics::string<>& Default::value(void) const
+{
+	return def_value;
+}
+
+///////////////////////////////////////////////////////////////////////////
+// Primary
+
+Primary::Primary(void)
+{ }
+
+Primary::~Primary(void)
+{ }
+
+///////////////////////////////////////////////////////////////////////////
+// Column
+
+Column::Column(ColType type, const basics::string<>& name, bool null)
+	: col_type(type)
+	, col_name(name)
+	, col_null(null)
+	, col_hasDefault(false)
+	, col_default()
+{ }
+
+Column::~Column(void)
+{ }
+
+//##TODO continue adding the rest of the code
+
+
+
+/*
+//## can something like this be done? if so how?
+template< typename TT extends Column >
+Database& Database::operator<<(TT& col)
+{
+	if( canAddColumn(col.name()) == true )
+		db_tbls.last() << col;
+	return *this;
+}
+*/
 #endif
 
 
@@ -177,10 +297,11 @@ void CSQLParameter::rebuild()
 	//	 `INSERT DELAYED' with `MyISAM'.  *Note `MyISAM' storage engine:
 	//	 MyISAM storage engine.
 
+	basics::slist< basics::string<> > existing_tables;
 	basics::CMySQLConnection dbcon1(CSQLParameter::sqlbase);
 	basics::string<> query;
 #ifdef DEVELOPING_CSQL
-	CSQLDatabase<basics::CMySQLConnection> db(dbcon1);
+	sq::Database athena;
 #endif
 
 	///////////////////////////////////////////////////////////////////////
@@ -188,7 +309,6 @@ void CSQLParameter::rebuild()
 	query << "SET FOREIGN_KEY_CHECKS=0";
 	dbcon1.PureQuery(query);
 	query.clear();
-
 
 	///////////////////////////////////////////////////////////////////////////
 	// drop all tables, drop child tables first
@@ -308,6 +428,18 @@ void CSQLParameter::rebuild()
 		dbcon1.PureQuery(query);
 		query.clear();
 	}
+	else
+	{	// get a list of all tables
+		query << "SHOW TABLES";
+		if( dbcon1.ResultQuery(query) )
+		{
+			for(; dbcon1; ++dbcon1)
+			{
+				existing_tables.insert(dbcon1[0]);
+			}
+		}
+		query.clear();
+	}
 
 
 	///////////////////////////////////////////////////////////////////////////
@@ -324,15 +456,12 @@ void CSQLParameter::rebuild()
 	query.clear();
 
 #ifdef DEVELOPING_CSQL
-	try
-	{
-		db.table(CSQLParameter::tbl_login_log)
-			.timestampCol  ("time").defaultsTo("CURRENT_TIMESTAMP")	.table()
-			.textCol       ("ip",16).isVariable().isNotNull()		.table()
-			.textCol       ("user",24).isVariable().isNotNull()		.table()
-			.intCol        ("rcode",3,typemarker<uint32>()).isNotNull()					.table()
-			.textCol       ("log",100).isVariable().isNotNull()		.table()
-			.usingEngine(CSQLParameter::sql_engine);
+	athena << sq::Table(CSQLParameter::tbl_login_log, CSQLParameter::sql_engine)
+		<< sq::Column(sq::TIMESTAMP,"time") << sq::Default("CURRENT_TIMESTAMP")
+		<< sq::TextColumn("ip",16,true,false)
+		<< sq::TextColumn("user",24,true,false)
+		<< sq::IntColumn<>("rcode",3,false)
+		<< sq::TextColumn("log",100,true,false);
 #endif
 
 	///////////////////////////////////////////////////////////////////////////
@@ -348,11 +477,10 @@ void CSQLParameter::rebuild()
 	query.clear();
 
 #ifdef DEVELOPING_CSQL
-		db.table(CSQLParameter::tbl_login_status)
-			.intCol        ("index",typemarker<uint32>()).isPrimary()				.table()
-			.textCol       ("name",24).isVariable().isNotNull()	.table()
-			.intCol        ("user",typemarker<uint32>()).isNotNull()					.table()
-			.usingEngine(CSQLParameter::sql_engine);
+	athena << sq::Table(CSQLParameter::tbl_login_status, CSQLParameter::sql_engine)
+		<< sq::IntColumn<>("index") << sq::Primary()
+		<< sq::TextColumn("name",24,true,false)
+		<< sq::IntColumn<>("user",false);
 #endif
 
 	///////////////////////////////////////////////////////////////////////////
@@ -380,24 +508,27 @@ void CSQLParameter::rebuild()
 	dbcon1.PureQuery(query);
 	query.clear();
 
+	query << "SET FOREIGN_KEY_CHECKS=0";
+	dbcon1.PureQuery(query);
+	query.clear();
+
 #ifdef DEVELOPING_CSQL
-		CSQLTable<basics::CMySQLConnection> &tbl_account = db.table(CSQLParameter::tbl_account)
-			.intCol        ("account_id",typemarker<uint32>()).autoIncrements().isPrimary()					.table()
-			.textCol       ("user_id",24).isVariable().isNotNull().isIndexed()			.table()
-			.textCol       ("user_pass",34).isVariable().isNotNull()					.table()
-			.enumCol       ("sex").has("M").has("F").has("S").defaultsTo("M")			.table()
-			.intCol        ("gm_level",3,typemarker<uint32>()).isNotNull().defaultsTo(0)						.table()
-			.bitCol        ("online",1).defaultsTo(0)									.table()
-			.textCol       ("email",40).isVariable().isNotNull().defaultsTo("a@a.com")	.table()
-			.intCol        ("logins_id1",typemarker<uint32>()).isNotNull().defaultsTo(0)						.table()
-			.intCol        ("logins_id2",typemarker<uint32>()).isNotNull().defaultsTo(0)						.table()
-			.textCol       ("client_ip",16).isVariable().isNotNull().defaultsTo("")		.table()
-			.textCol       ("last_login",24).isVariable().isNotNull().defaultsTo("")	.table()
-			.intCol        ("login_count",typemarker<uint32>()).isNotNull().defaultsTo(0)					.table()
-			.intCol        ("ban_until",typemarker<uint32>()).isNotNull().defaultsTo(0)						.table()
-			.intCol        ("valid_until",typemarker<uint32>()).isNotNull().defaultsTo(0)					.table()
-			.usingEngine(CSQLParameter::sql_engine)
-			.autoIncrementsFrom(start_account_num);
+	basics::string<> tbl_account(CSQLParameter::tbl_account);
+	athena << sq::Table(tbl_account, CSQLParameter::sql_engine)
+		<< sq::IntColumn<>("account_id") << sq::AutoIncrements(start_account_num) << sq::Primary()
+		<< sq::TextColumn("user_id",24,true,false) << sq::Index()
+		<< sq::TextColumn("user_pass",34,true,false)
+		<< sq::EnumColumn("sex","M","F","S") << sq::Default("M")
+		<< sq::IntColumn<>("gm_level",3,false) << sq::Default(0)
+		<< sq::BitColumn("online",1) << sq::Default(0)
+		<< sq::TextColumn("email",40,true,false) << sq::Default("a@a.com")
+		<< sq::IntColumn<>("login_id1",false) << sq::Default(0)
+		<< sq::IntColumn<>("login_id2",false) << sq::Default(0)
+		<< sq::TextColumn("client_ip",16,true,false) << sq::Default("")
+		<< sq::TextColumn("last_login",24,true,false) << sq::Default("")
+		<< sq::IntColumn<>("login_count",false) << sq::Default(0)
+		<< sq::IntColumn<>("ban_until",false) << sq::Default(0)
+		<< sq::IntColumn<>("valid_until",false) << sq::Default(0);
 #endif
 
 	query << "INSERT INTO `" << dbcon1.escaped(CSQLParameter::tbl_account) << "` "
@@ -415,12 +546,13 @@ void CSQLParameter::rebuild()
 	///////////////////////////////////////////////////////////////////////////
 	// add the default accounts 
 	//## change to inserting data from the config file
-	if( CSQLParameter::wipe_sql )
+	if( CSQLParameter::wipe_sql() || !existing_tables.find(CSQLParameter::tbl_account) )
 	{
 		query << "INSERT INTO `" << dbcon1.escaped(CSQLParameter::tbl_account) << "` "
 				 "(`user_id`,`user_pass`,`sex`) VALUES ('s1','p1','S'),('s2','p2','S'),('s3','p3','S')";
 		dbcon1.PureQuery(query);
 		query.clear();
+		ShowInfo("created default server accounts\n"CL_SPACE"it is recommended to modify the passwords\n");
 	}
 
 	///////////////////////////////////////////////////////////////////////////
@@ -438,11 +570,10 @@ void CSQLParameter::rebuild()
 	query.clear();
 
 #ifdef DEVELOPING_CSQL
-		db.table(CSQLParameter::tbl_login_reg)
-			.referenceCol(tbl_account["account_id"],CSQL_CASCADE,CSQL_CASCADE).isPrimary()	.table()
-			.textCol     ("str",34).isVariable().isPrimary()								.table()
-			.textCol     ("value",255).isVariable().isNotNull().defaultsTo("")				.table()
-			.usingEngine(CSQLParameter::sql_engine);
+	athena << sq::Table(CSQLParameter::tbl_login_reg, CSQLParameter::sql_engine)
+		<< sq::RefColumn("account_id", sq::ACTION_CASCADE, sq::ACTION_CASCADE, tbl_account) << sq::Primary()
+		<< sq::TextColumn("str",34,true,false) << sq::Primary()
+		<< sq::TextColumn("value",255,true,false) << sq::Default("");
 #endif
 
 	///////////////////////////////////////////////////////////////////////////
@@ -460,11 +591,13 @@ void CSQLParameter::rebuild()
 	query.clear();
 
 #ifdef DEVELOPING_CSQL
-		db.table(CSQLParameter::tbl_login_reg2)
-			.referenceCol(tbl_account["account_id"],CSQL_CASCADE,CSQL_CASCADE).isPrimary()	.table()
-			.textCol     ("str",34).isVariable().isPrimary()								.table()
-			.textCol     ("value",255).isVariable().isNotNull().defaultsTo("")				.table()
-			.usingEngine(CSQLParameter::sql_engine);
+	athena << sq::CopyTable(CSQLParameter::tbl_login_reg2,CSQLParameter::tbl_login_reg);
+	/*
+	athena << sq::Table(CSQLParameter::tbl_login_reg2, CSQLParameter::sql_engine)
+		<< sq::RefColumn("account_id", sq::ACTION_CASCADE, sq::ACTION_CASCADE, tbl_account) << sq::Primary()
+		<< sq::TextColumn("str",34,true) << sq::Primary()
+		<< sq::TextColumn("value",255,true,false) << sq::Default("");
+	*/
 #endif
 
 	///////////////////////////////////////////////////////////////////////////
@@ -531,58 +664,61 @@ void CSQLParameter::rebuild()
 	dbcon1.PureQuery(query);
 	query.clear();
 
+	query << "SET FOREIGN_KEY_CHECKS=0";
+	dbcon1.PureQuery(query);
+	query.clear();
+
 #ifdef DEVELOPING_CSQL
-		CSQLTable<basics::CMySQLConnection> &tbl_char = db.table(CSQLParameter::tbl_char)
-			.intCol        ("char_id",typemarker<uint32>()).autoIncrements().isPrimary()								.table()
-			.referenceCol  (tbl_account["account_id"],CSQL_CASCADE,CSQL_CASCADE).defaultsTo(0)	.table()
-			.intCol        ("slot",typemarker<uint8>()).isNotNull().defaultsTo(0)									.table()
-			.textCol       ("name",24).isVariable().isNotNull().defaultsTo("").isIndexed()		.table()
-			.intCol        ("class",typemarker<uint16>()).isNotNull().defaultsTo(0)									.table()
-			.intCol        ("base_level",typemarker<uint16>()).isNotNull().defaultsTo(1)								.table()
-			.intCol        ("job_level",typemarker<uint16>()).isNotNull().defaultsTo(1)								.table()
-			.intCol        ("base_exp",typemarker<uint64>()).isNotNull().defaultsTo(0)								.table()
-			.intCol        ("job_exp",typemarker<uint64>()).isNotNull().defaultsTo(0)								.table()
-			.intCol        ("zeny",typemarker<uint64>()).isNotNull().defaultsTo(0)									.table()
-			.intCol        ("str",typemarker<uint16>()).isNotNull().defaultsTo(0)									.table()
-			.intCol        ("agi",typemarker<uint16>()).isNotNull().defaultsTo(0)									.table()
-			.intCol        ("vit",typemarker<uint16>()).isNotNull().defaultsTo(0)									.table()
-			.intCol        ("int",typemarker<uint16>()).isNotNull().defaultsTo(0)									.table()
-			.intCol        ("dex",typemarker<uint16>()).isNotNull().defaultsTo(0)									.table()
-			.intCol        ("luk",typemarker<uint16>()).isNotNull().defaultsTo(0)									.table()
-			.intCol        ("max_hp",typemarker<uint32>()).isNotNull().defaultsTo(0)									.table()
-			.intCol        ("hp",typemarker<uint32>()).isNotNull().defaultsTo(0)										.table()
-			.intCol        ("max_sp",typemarker<uint32>()).isNotNull().defaultsTo(0)									.table()
-			.intCol        ("sp",typemarker<uint32>()).isNotNull().defaultsTo(0)										.table()
-			.intCol        ("status_point",typemarker<uint16>()).isNotNull().defaultsTo(0)							.table()
-			.intCol        ("skill_point",typemarker<uint16>()).isNotNull().defaultsTo(0)							.table()
-			.intCol        ("option",typemarker<int16>()).isNotNull().defaultsTo(0)									.table()
-			.intCol        ("karma",typemarker<uint8>()).isNotNull().defaultsTo(0)									.table()
-			.intCol        ("chaos",typemarker<uint8>()).isNotNull().defaultsTo(0)									.table()
-			.intCol        ("manner",typemarker<int16>()).isNotNull().defaultsTo(0)									.table()
-			.intCol        ("party_id",typemarker<uint32>()).isNotNull().defaultsTo(0).isIndexed()					.table()
-			.intCol        ("guild_id",typemarker<uint32>()).isNotNull().defaultsTo(0).isIndexed()					.table()
-			.intCol        ("pet_id",typemarker<uint32>()).isNotNull().defaultsTo(0)									.table()
-			.intCol        ("hair",typemarker<uint16>()).isNotNull().defaultsTo(0)									.table()
-			.intCol        ("hair_color",typemarker<uint16>()).isNotNull().defaultsTo(0)								.table()
-			.intCol        ("clothes_color",typemarker<uint16>()).isNotNull().defaultsTo(0)							.table()
-			.intCol        ("weapon",typemarker<uint16>()).isNotNull().defaultsTo(1)									.table()
-			.intCol        ("shield",typemarker<uint16>()).isNotNull().defaultsTo(0)									.table()
-			.intCol        ("head_top",typemarker<uint16>()).isNotNull().defaultsTo(0)								.table()
-			.intCol        ("head_mid",typemarker<uint16>()).isNotNull().defaultsTo(0)								.table()
-			.intCol        ("head_bottom",typemarker<uint16>()).isNotNull().defaultsTo(0)							.table()
-			.textCol       ("last_map",20).isVariable().isNotNull().defaultsTo("new_5-1")		.table()
-			.intCol        ("last_x",typemarker<uint16>()).isNotNull().defaultsTo(53)								.table()
-			.intCol        ("last_y",typemarker<uint16>()).isNotNull().defaultsTo(111)								.table()
-			.textCol       ("save_map",20).isVariable().isNotNull().defaultsTo("new_5-1")		.table()
-			.intCol        ("save_x",typemarker<uint16>()).isNotNull().defaultsTo(53)								.table()
-			.intCol        ("save_y",typemarker<uint16>()).isNotNull().defaultsTo(111)								.table()
-			.intCol        ("partner_id",typemarker<uint32>()).isNotNull().defaultsTo(0)								.table()
-			.intCol        ("mother_id",typemarker<uint32>()).isNotNull().defaultsTo(0)								.table()
-			.intCol        ("child_id",typemarker<uint32>()).isNotNull().defaultsTo(0)								.table()
-			.intCol        ("fame_points",typemarker<uint32>()).isNotNull().defaultsTo(0)							.table()
-			.bitCol        ("online",1).isNotNull().defaultsTo(0)								.table()
-			.usingEngine(CSQLParameter::sql_engine)
-			.autoIncrementsFrom(start_account_num);
+	basics::string<> tbl_char(CSQLParameter::tbl_char);
+	athena << sq::Table(tbl_char, CSQLParameter::sql_engine)
+		<< sq::IntColumn<>("char_id") << sq::AutoIncrements(start_account_num) << sq::Primary()
+		<< sq::RefColumn("account_id", sq::ACTION_CASCADE, sq::ACTION_CASCADE, tbl_account) << sq::Default(0)
+		<< sq::IntColumn<uint8>("slot",false) << sq::Default(0)
+		<< sq::TextColumn("name",24,true,false) << sq::Default("")
+		<< sq::IntColumn<uint16>("class",false) << sq::Default(0)
+		<< sq::IntColumn<uint16>("base_level",false) << sq::Default(1)
+		<< sq::IntColumn<uint16>("job_level",false) << sq::Default(1)
+		<< sq::IntColumn<uint64>("base_exp",false) << sq::Default(0)
+		<< sq::IntColumn<uint64>("job_exp",false) << sq::Default(0)
+		<< sq::IntColumn<uint64>("zeny",false) << sq::Default(0)
+		<< sq::IntColumn<uint16>("str",false) << sq::Default(0)
+		<< sq::IntColumn<uint16>("agi",false) << sq::Default(0)
+		<< sq::IntColumn<uint16>("vit",false) << sq::Default(0)
+		<< sq::IntColumn<uint16>("int",false) << sq::Default(0)
+		<< sq::IntColumn<uint16>("dex",false) << sq::Default(0)
+		<< sq::IntColumn<uint16>("luk",false) << sq::Default(0)
+		<< sq::IntColumn<>("max_hp",false) << sq::Default(0)
+		<< sq::IntColumn<>("hp",false) << sq::Default(0)
+		<< sq::IntColumn<>("max_sp",false) << sq::Default(0)
+		<< sq::IntColumn<>("sp",false) << sq::Default(0)
+		<< sq::IntColumn<uint16>("status_point",false) << sq::Default(0)
+		<< sq::IntColumn<uint16>("skill_point",false) << sq::Default(0)
+		<< sq::IntColumn<int16>("option",false) << sq::Default(0)
+		<< sq::IntColumn<uint8>("karma",false) << sq::Default(0)
+		<< sq::IntColumn<uint8>("chaos",false) << sq::Default(0)
+		<< sq::IntColumn<int16>("manner",false) << sq::Default(0)
+		<< sq::IntColumn<>("party_id",false) << sq::Default(0) << sq::Index()
+		<< sq::IntColumn<>("guild_id",false) << sq::Default(0) << sq::Index()
+		<< sq::IntColumn<>("pet_id",false) << sq::Default(0)
+		<< sq::IntColumn<uint16>("hair",false) << sq::Default(0)
+		<< sq::IntColumn<uint16>("hair_color",false) << sq::Default(0)
+		<< sq::IntColumn<uint16>("clothes_color",false) << sq::Default(0)
+		<< sq::IntColumn<uint16>("weapon",false) << sq::Default(0)
+		<< sq::IntColumn<uint16>("shield",false) << sq::Default(0)
+		<< sq::IntColumn<uint16>("head_top",false) << sq::Default(0)
+		<< sq::IntColumn<uint16>("head_mid",false) << sq::Default(0)
+		<< sq::IntColumn<uint16>("head_bottom",false) << sq::Default(0)
+		<< sq::TextColumn("last_map",20,true,false) << sq::Default("new_5-1")
+		<< sq::IntColumn<uint16>("last_x",false) << sq::Default(53)
+		<< sq::IntColumn<uint16>("last_y",false) << sq::Default(111)
+		<< sq::TextColumn("save_map",20,true,false) << sq::Default("new_5-1")
+		<< sq::IntColumn<uint16>("save_x",false) << sq::Default(53)
+		<< sq::IntColumn<uint16>("save_y",false) << sq::Default(111)
+		<< sq::IntColumn<>("partner_id",false) << sq::Default(0)
+		<< sq::IntColumn<>("mother_id",false) << sq::Default(0)
+		<< sq::IntColumn<>("child_id",false) << sq::Default(0)
+		<< sq::IntColumn<>("fame_points",false) << sq::Default(0)
+		<< sq::BitColumn("online",1) << sq::Default(0);
 #endif
 
 	query << "INSERT INTO `" << dbcon1.escaped(CSQLParameter::tbl_char) << "` "
@@ -613,11 +749,10 @@ void CSQLParameter::rebuild()
 	query.clear();
 
 #ifdef DEVELOPING_CSQL
-		db.table(CSQLParameter::tbl_char_reg)
-			.referenceCol(tbl_char["char_id"],CSQL_CASCADE,CSQL_CASCADE).defaultsTo(0).isPrimary()	.table()
-			.textCol     ("str",32).isVariable().isPrimary()										.table()
-			.textCol     ("value",255).isVariable().isNotNull().defaultsTo("")						.table()
-			.usingEngine(CSQLParameter::sql_engine);
+	athena << sq::Table(CSQLParameter::tbl_char_reg, CSQLParameter::sql_engine)
+		<< sq::RefColumn("char_id",sq::ACTION_CASCADE,sq::ACTION_CASCADE,tbl_char) << sq::Primary()
+		<< sq::TextColumn("str",32,true,false) << sq::Primary()
+		<< sq::TextColumn("value",255,true,false) << sq::Default("");
 #endif
 
 	///////////////////////////////////////////////////////////////////////////
@@ -635,10 +770,9 @@ void CSQLParameter::rebuild()
 	query.clear();
 
 #ifdef DEVELOPING_CSQL
-		db.table(CSQLParameter::tbl_friends)
-			.referenceCol(tbl_char["char_id"],CSQL_CASCADE,CSQL_CASCADE).defaultsTo(0).isPrimary()				.table()
-			.referenceCol("friend_id",tbl_char["char_id"],CSQL_CASCADE,CSQL_CASCADE).defaultsTo(0).isPrimary()	.table()
-			.usingEngine(CSQLParameter::sql_engine);
+	athena << sq::Table(CSQLParameter::tbl_friends, CSQLParameter::sql_engine)
+		<< sq::RefColumn("char_id",sq::ACTION_CASCADE,sq::ACTION_CASCADE,tbl_char) << sq::Default(0) << sq::Primary()
+		<< sq::RefColumn("friend_id","char_id",sq::ACTION_CASCADE,sq::ACTION_CASCADE,tbl_char) << sq::Default(0) << sq::Primary();
 #endif
 
 	///////////////////////////////////////////////////////////////////////////
@@ -662,19 +796,18 @@ void CSQLParameter::rebuild()
 	query.clear();
 
 #ifdef DEVELOPING_CSQL
-		db.table(CSQLParameter::tbl_inventory)
-			.referenceCol  (tbl_char["char_id"],CSQL_CASCADE,CSQL_CASCADE).defaultsTo(0)	.table()
-			.intCol        ("nameid",typemarker<uint16>()).isNotNull().defaultsTo(0)								.table()
-			.intCol        ("equip",typemarker<uint16>()).isNotNull().defaultsTo(0)								.table()
-			.intCol        ("amount",typemarker<uint16>()).isNotNull().defaultsTo(0)								.table()
-			.intCol        ("refine",2,typemarker<uint8>()).isNotNull().defaultsTo(0)							.table()
-			.intCol        ("attribute",typemarker<uint8>()).isNotNull().defaultsTo(0)							.table()
-			.intCol        ("identify",typemarker<uint8>()).isNotNull().defaultsTo(1)							.table()
-			.intCol        ("card0",typemarker<uint16>()).isNotNull().defaultsTo(0)								.table()
-			.intCol        ("card1",typemarker<uint16>()).isNotNull().defaultsTo(0)								.table()
-			.intCol        ("card2",typemarker<uint16>()).isNotNull().defaultsTo(0)								.table()
-			.intCol        ("card3",typemarker<uint16>()).isNotNull().defaultsTo(0)								.table()
-			.usingEngine(CSQLParameter::sql_engine);
+	athena << sq::Table(CSQLParameter::tbl_inventory, CSQLParameter::sql_engine)
+		<< sq::RefColumn("char_id",sq::ACTION_CASCADE,sq::ACTION_CASCADE,tbl_char) << sq::Default(0) << sq::Primary()
+		<< sq::IntColumn<uint16>("nameid",false) << sq::Default(0)
+		<< sq::IntColumn<uint16>("equip",false) << sq::Default(0)
+		<< sq::IntColumn<uint16>("amount",false) << sq::Default(0)
+		<< sq::IntColumn<uint8>("refine",2,false) << sq::Default(0)
+		<< sq::IntColumn<uint8>("attribute",false) << sq::Default(0)
+		<< sq::IntColumn<uint8>("identify",false) << sq::Default(1)
+		<< sq::IntColumn<uint16>("card0",false) << sq::Default(0)
+		<< sq::IntColumn<uint16>("card1",false) << sq::Default(0)
+		<< sq::IntColumn<uint16>("card2",false) << sq::Default(0)
+		<< sq::IntColumn<uint16>("card3",false) << sq::Default(0);
 #endif
 
 	///////////////////////////////////////////////////////////////////////////
@@ -698,19 +831,21 @@ void CSQLParameter::rebuild()
 	query.clear();
 
 #ifdef DEVELOPING_CSQL
-		db.table(CSQLParameter::tbl_cart)
-			.referenceCol  (tbl_char["char_id"],CSQL_CASCADE,CSQL_CASCADE).defaultsTo(0)	.table()
-/*			.intCol<uint16>("nameid").isNotNull().defaultsTo(0)								.table()
-			.intCol<uint16>("equip").isNotNull().defaultsTo(0)								.table()
-			.intCol<uint32>("amount").isNotNull().defaultsTo(0)								.table()
-			.intCol<uint8> ("refine",2).isNotNull().defaultsTo(0)							.table()
-			.intCol<uint8> ("attribute").isNotNull().defaultsTo(0)							.table()
-			.intCol<uint8> ("identify").isNotNull().defaultsTo(1)							.table()
-			.intCol<uint16>("card0").isNotNull().defaultsTo(0)								.table()
-			.intCol<uint16>("card1").isNotNull().defaultsTo(0)								.table()
-			.intCol<uint16>("card2").isNotNull().defaultsTo(0)								.table()
-			.intCol<uint16>("card3").isNotNull().defaultsTo(0)								.table()
-*/			.usingEngine(CSQLParameter::sql_engine);
+	/*
+	athena << sq::CopyTable(CSQLParameter::tbl_cart, CSQLParameter::tbl_inventory);
+	*/
+	athena << sq::Table(CSQLParameter::tbl_cart, CSQLParameter::sql_engine)
+		<< sq::RefColumn("char_id",sq::ACTION_CASCADE,sq::ACTION_CASCADE,tbl_char) << sq::Default(0)
+		<< sq::IntColumn<uint16>("nameid",false) << sq::Default(0)
+		<< sq::IntColumn<uint16>("equip",false) << sq::Default(0)
+		<< sq::IntColumn<uint16>("amount",false) << sq::Default(0)
+		<< sq::IntColumn<uint8>("refine",2,false) << sq::Default(0)
+		<< sq::IntColumn<uint8>("attribute",false) << sq::Default(0)
+		<< sq::IntColumn<uint8>("identify",false) << sq::Default(1)
+		<< sq::IntColumn<uint16>("card0",false) << sq::Default(0)
+		<< sq::IntColumn<uint16>("card1",false) << sq::Default(0)
+		<< sq::IntColumn<uint16>("card2",false) << sq::Default(0)
+		<< sq::IntColumn<uint16>("card3",false) << sq::Default(0);
 #endif
 
 	///////////////////////////////////////////////////////////////////////////
@@ -727,12 +862,11 @@ void CSQLParameter::rebuild()
 	query.clear();
 
 #ifdef DEVELOPING_CSQL
-		db.table(CSQLParameter::tbl_memo)
-			.referenceCol  (tbl_char["char_id"],CSQL_CASCADE,CSQL_CASCADE).defaultsTo(0)	.table()
-			.textCol       ("map",20).isVariable().isNotNull().defaultsTo("")				.table()
-/*			.intCol<uint16>("x").isNotNull().defaultsTo(0)									.table()
-			.intCol<uint16>("y").isNotNull().defaultsTo(0)									.table()
-*/			.usingEngine(CSQLParameter::sql_engine);
+	athena << sq::Table(CSQLParameter::tbl_memo, CSQLParameter::sql_engine)
+		<< sq::RefColumn("char_id",sq::ACTION_CASCADE,sq::ACTION_CASCADE,tbl_char) << sq::Default(0)
+		<< sq::TextColumn("map",20,true,false) << sq::Default("")
+		<< sq::IntColumn<uint16>("x",false) << sq::Default(0)
+		<< sq::IntColumn<uint16>("y",false) << sq::Default(0);
 #endif
 
 	///////////////////////////////////////////////////////////////////////////
@@ -749,11 +883,10 @@ void CSQLParameter::rebuild()
 	query.clear();
 
 #ifdef DEVELOPING_CSQL
-		db.table(CSQLParameter::tbl_skill)
-			.referenceCol  (tbl_char["char_id"],CSQL_CASCADE,CSQL_CASCADE).defaultsTo(0).isPrimary()	.table()
-/*			.intCol<uint16>("id").isNotNull().defaultsTo(0).isPrimary()									.table()
-			.intCol<uint16>("lv").isNotNull().defaultsTo(0)												.table()
-*/			.usingEngine(CSQLParameter::sql_engine);
+	athena << sq::Table(CSQLParameter::tbl_skill, CSQLParameter::sql_engine)
+		<< sq::RefColumn("char_id",sq::ACTION_CASCADE,sq::ACTION_CASCADE,tbl_char) << sq::Default(0) << sq::Primary()
+		<< sq::IntColumn<uint16>("id",false) << sq::Default(0) << sq::Primary()
+		<< sq::IntColumn<uint16>("lv",false) << sq::Default(0) << sq::Primary();
 #endif
 
 	///////////////////////////////////////////////////////////////////////////
@@ -787,29 +920,27 @@ void CSQLParameter::rebuild()
 	query.clear();
 
 #ifdef DEVELOPING_CSQL
-		db.table(CSQLParameter::tbl_mail)
-/*			.intCol<uint32>("message_id").isNotNull().autoIncrements().isPrimary()						.table()
-			.referenceCol  ("to_char_id",tbl_char["char_id"],CSQL_CASCADE,CSQL_CASCADE).defaultsTo(0)	.table()
-			.textCol       ("to_char_name",24).isVariable().isNotNull().defaultsTo("")					.table()
-			.intCol<uint32>("from_char_id").isNotNull().defaultsTo(0)									.table()
-			.textCol       ("from_char_name",24).isVariable().isNotNull().defaultsTo("")				.table()
-			.textCol       ("header",32).isVariable().isNotNull().defaultsTo("")						.table()
-			.textCol       ("message",80).isVariable().isNotNull().defaultsTo("")						.table()
-			.bitCol        ("read_flag",1).defaultsTo(0)												.table()
-			.intCol<uint32>("sendtime").isNotNull().defaultsTo(0)										.table()
-			.intCol<uint32>("zeny").isNotNull().defaultsTo(0)											.table()
-			.intCol<uint16>("item_nameid").isNotNull().defaultsTo(0)									.table()
-			.intCol<uint32>("item_amount").isNotNull().defaultsTo(0)									.table()
-			.intCol<uint16>("item_equip").isNotNull().defaultsTo(0)										.table()
-			.intCol<uint8> ("item_identify").isNotNull().defaultsTo(1)									.table()
-			.intCol<uint8> ("item_refine").isNotNull().defaultsTo(0)									.table()
-			.intCol<uint8> ("item_attribute").isNotNull().defaultsTo(0)									.table()
-			.intCol<uint16>("item_card0").isNotNull().defaultsTo(0)										.table()
-			.intCol<uint16>("item_card1").isNotNull().defaultsTo(0)										.table()
-			.intCol<uint16>("item_card2").isNotNull().defaultsTo(0)										.table()
-			.intCol<uint16>("item_card3").isNotNull().defaultsTo(0)										.table()
-*/			.usingEngine(CSQLParameter::sql_engine)
-			.autoIncrementsFrom(1);
+	athena << sq::Table(CSQLParameter::tbl_mail, CSQLParameter::sql_engine)
+		<< sq::IntColumn<uint32>("message_id",false) << sq::AutoIncrements(1) << sq::Primary()
+		<< sq::RefColumn("to_char_id","char_id",sq::ACTION_CASCADE,sq::ACTION_CASCADE,tbl_char) << sq::Default(0)
+		<< sq::TextColumn("to_char_name",24,true,false) << sq::Default("")
+		<< sq::IntColumn<uint32>("from_char_id",false) << sq::Default(0)
+		<< sq::TextColumn("from_char_name",24,true,false) << sq::Default("")
+		<< sq::TextColumn("header",32,true,false) << sq::Default("")
+		<< sq::TextColumn("message",80,true,false) << sq::Default("")
+		<< sq::BitColumn("read_flag",1) << sq::Default(0)
+		<< sq::IntColumn<>("sendtime",false) << sq::Default(0)
+		<< sq::IntColumn<>("zeny",false) << sq::Default(0)
+		<< sq::IntColumn<uint16>("item_nameid",false) << sq::Default(0)
+		<< sq::IntColumn<>("item_amount",false) << sq::Default(0)
+		<< sq::IntColumn<uint16>("item_equip",false) << sq::Default(0)
+		<< sq::IntColumn<uint8>("item_identify",false) << sq::Default(1)
+		<< sq::IntColumn<uint8>("item_refine",false) << sq::Default(0)
+		<< sq::IntColumn<uint8>("item_attribute",false) << sq::Default(0)
+		<< sq::IntColumn<uint16>("item_card0",false) << sq::Default(0)
+		<< sq::IntColumn<uint16>("item_card1",false) << sq::Default(0)
+		<< sq::IntColumn<uint16>("item_card2",false) << sq::Default(0)
+		<< sq::IntColumn<uint16>("item_card3",false) << sq::Default(0);
 #endif
 
 	///////////////////////////////////////////////////////////////////////////
@@ -834,20 +965,18 @@ void CSQLParameter::rebuild()
 	query.clear();
 
 #ifdef DEVELOPING_CSQL
-		db.table(CSQLParameter::tbl_storage)
-			.referenceCol  (tbl_account["account_id"],CSQL_CASCADE,CSQL_CASCADE).defaultsTo(0)	.table()
-/*			.intCol<uint16>("nameid").isNotNull().defaultsTo(0)									.table()
-			.intCol<uint16>("equip").isNotNull().defaultsTo(0)									.table()
-			.intCol<uint32>("amount").isNotNull().defaultsTo(0)									.table()
-			.intCol<uint8> ("refine").isNotNull().defaultsTo(0)									.table()
-			.intCol<uint8> ("attribute").isNotNull().defaultsTo(0)								.table()
-			.intCol<uint8> ("identify").isNotNull().defaultsTo(1)								.table()
-			.intCol<uint16>("card0").isNotNull().defaultsTo(0)									.table()
-			.intCol<uint16>("card1").isNotNull().defaultsTo(0)									.table()
-			.intCol<uint16>("card2").isNotNull().defaultsTo(0)									.table()
-			.intCol<uint16>("card3").isNotNull().defaultsTo(0)									.table()
-*/			.usingEngine(CSQLParameter::sql_engine);
-
+	athena << sq::Table(CSQLParameter::tbl_storage, CSQLParameter::sql_engine)
+		<< sq::RefColumn("account_id",sq::ACTION_CASCADE,sq::ACTION_CASCADE,tbl_account) << sq::Default(0)
+		<< sq::IntColumn<uint16>("nameid",false) << sq::Default(0)
+		<< sq::IntColumn<uint16>("equip",false) << sq::Default(0)
+		<< sq::IntColumn<>("amount",false) << sq::Default(0)
+		<< sq::IntColumn<uint8>("refine",2,false) << sq::Default(0)
+		<< sq::IntColumn<uint8>("attribute",false) << sq::Default(0)
+		<< sq::IntColumn<uint8>("identify",false) << sq::Default(1)
+		<< sq::IntColumn<uint16>("card0",false) << sq::Default(0)
+		<< sq::IntColumn<uint16>("card1",false) << sq::Default(0)
+		<< sq::IntColumn<uint16>("card2",false) << sq::Default(0)
+		<< sq::IntColumn<uint16>("card3",false) << sq::Default(0);
 #endif
 
 	///////////////////////////////////////////////////////////////////////////
@@ -876,31 +1005,34 @@ void CSQLParameter::rebuild()
 	dbcon1.PureQuery(query);
 	query.clear();
 
+	query << "SET FOREIGN_KEY_CHECKS=0";
+	dbcon1.PureQuery(query);
+	query.clear();
+
 #ifdef DEVELOPING_CSQL
-		CSQLTable<basics::CMySQLConnection> &tbl_guild = db.table(CSQLParameter::tbl_guild)
-/*			.intCol<uint32>("guild_id").isNotNull().autoIncrements().isPrimary()						.table()
-			.intCol<uint16>("guild_lv").isNotNull().defaultsTo(0)										.table()
-			.intCol<uint16>("connect_member").isNotNull().defaultsTo(0)									.table()
-			.intCol<uint16>("max_member").isNotNull().defaultsTo(0)										.table()
-			.intCol<uint16>("average_lv").isNotNull().defaultsTo(0)										.table()
-			.intCol<uint32>("exp").isNotNull().defaultsTo(0)											.table()
-			.intCol<uint32>("next_exp").isNotNull().defaultsTo(0)										.table()
-			.intCol<uint16>("skill_point").isNotNull().defaultsTo(0)									.table()
-			.textCol       ("name",24).isNotNull().defaultsTo("")										.table()
-			.referenceCol  ("master_id",tbl_char["char_id"],CSQL_CASCADE,CSQL_CASCADE).defaultsTo(0)	.table()
-			.textCol       ("mes1",64).isNotNull().defaultsTo("")										.table()
-			.textCol       ("mes2",128).isNotNull().defaultsTo("")										.table()
-			.intCol<uint32>("emblem_id").isNotNull().defaultsTo(0)										.table()
-			.intCol<uint16>("emblem_len").isNotNull().defaultsTo(0)										.table()
-			.byteCol       ("emblem_data").isNotNull()													.table()
-*/			.usingEngine(CSQLParameter::sql_engine)
-			.autoIncrementsFrom(start_guild_num);
+	basics::string<> tbl_guild(CSQLParameter::tbl_guild);
+	athena << sq::Table(tbl_guild, CSQLParameter::sql_engine)
+		<< sq::IntColumn<>("guild_id") << sq::AutoIncrements(start_guild_num) << sq::Primary()
+		<< sq::IntColumn<uint16>("guild_lv",false) << sq::Default(0)
+		<< sq::IntColumn<uint16>("connect_member",false) << sq::Default(0)
+		<< sq::IntColumn<uint16>("max_member",false) << sq::Default(0)
+		<< sq::IntColumn<uint16>("average_lv",false) << sq::Default(0)
+		<< sq::IntColumn<>("exp",false) << sq::Default(0)
+		<< sq::IntColumn<>("next_exp",false) << sq::Default(0)
+		<< sq::IntColumn<uint16>("skill_point",false) << sq::Default(0)
+		<< sq::TextColumn("name",24,false,false) << sq::Default("")
+		<< sq::RefColumn("master_id","char_id",sq::ACTION_CASCADE,sq::ACTION_CASCADE,tbl_char) << sq::Default(0)
+		<< sq::TextColumn("mes1",64,false,false) << sq::Default("")
+		<< sq::TextColumn("mes2",128,false,false) << sq::Default("")
+		<< sq::IntColumn<>("emblem_id",false) << sq::Default(0)
+		<< sq::IntColumn<uint16>("emblem_len",false) << sq::Default(0)
+		<< sq::ByteColumn("emblem_data",false);
 #endif
 
 	query << "INSERT INTO `" << dbcon1.escaped(CSQLParameter::tbl_guild) << "` "
-			 "(`guild_id`) "
+			 "(`guild_id`,`emblem_data`) "
 			 "VALUES "
-			 "('" << start_guild_num << "')";
+			 "('" << start_guild_num << "','')";
 	dbcon1.PureQuery(query);
 	query.clear();
 	query << "DELETE FROM `" << dbcon1.escaped(CSQLParameter::tbl_guild) << "` "
@@ -931,19 +1063,18 @@ void CSQLParameter::rebuild()
 	query.clear();
 
 #ifdef DEVELOPING_CSQL
-		db.table(CSQLParameter::tbl_guild_storage)
-/*			.referenceCol  (tbl_guild["guild_id"],CSQL_CASCADE,CSQL_CASCADE).defaultsTo(0)	.table()
-			.intCol<uint16>("nameid").isNotNull().defaultsTo(0)								.table()
-			.intCol<uint16>("equip").isNotNull().defaultsTo(0)								.table()
-			.intCol<uint32>("amount").isNotNull().defaultsTo(0)								.table()
-			.intCol<uint8> ("refine").isNotNull().defaultsTo(0)								.table()
-			.intCol<uint8> ("attribute").isNotNull().defaultsTo(0)							.table()
-			.intCol<uint8> ("identify").isNotNull().defaultsTo(1)							.table()
-			.intCol<uint16>("card0").isNotNull().defaultsTo(0)								.table()
-			.intCol<uint16>("card1").isNotNull().defaultsTo(0)								.table()
-			.intCol<uint16>("card2").isNotNull().defaultsTo(0)								.table()
-			.intCol<uint16>("card3").isNotNull().defaultsTo(0)								.table()
-*/			.usingEngine(CSQLParameter::sql_engine);
+	athena << sq::Table(CSQLParameter::tbl_guild_storage, CSQLParameter::sql_engine)
+		<< sq::RefColumn("guild_id",sq::ACTION_CASCADE,sq::ACTION_CASCADE,tbl_guild) << sq::Default(0)
+		<< sq::IntColumn<uint16>("nameid",false) << sq::Default(0)
+		<< sq::IntColumn<uint16>("equip",false) << sq::Default(0)
+		<< sq::IntColumn<>("amount",false) << sq::Default(0)
+		<< sq::IntColumn<uint8>("refine",2,false) << sq::Default(0)
+		<< sq::IntColumn<uint8>("attribute",false) << sq::Default(0)
+		<< sq::IntColumn<uint8>("identify",false) << sq::Default(1)
+		<< sq::IntColumn<uint16>("card0",false) << sq::Default(0)
+		<< sq::IntColumn<uint16>("card1",false) << sq::Default(0)
+		<< sq::IntColumn<uint16>("card2",false) << sq::Default(0)
+		<< sq::IntColumn<uint16>("card3",false) << sq::Default(0);
 #endif
 
 	///////////////////////////////////////////////////////////////////////////
@@ -966,15 +1097,14 @@ void CSQLParameter::rebuild()
 	query.clear();
 
 #ifdef DEVELOPING_CSQL
-		db.table(CSQLParameter::tbl_guild_member)
-			.referenceCol  (tbl_char["char_id"],CSQL_CASCADE,CSQL_CASCADE).defaultsTo(0).isPrimary()	.table()
-			.referenceCol  (tbl_guild["guild_id"],CSQL_CASCADE,CSQL_CASCADE).defaultsTo(0).isPrimary()	.table()
-/*			.intCol<uint32>("exp").isNotNull().defaultsTo(0)											.table()
-			.intCol<uint32>("exp_payper").isNotNull().defaultsTo(0)										.table()
-			.intCol<uint16>("position").isNotNull().defaultsTo(0)										.table()
-			.intCol<uint32>("rsv1").isNotNull().defaultsTo(0)											.table()
-			.intCol<uint32>("rsv2").isNotNull().defaultsTo(0)											.table()
-*/			.usingEngine(CSQLParameter::sql_engine);
+	athena << sq::Table(CSQLParameter::tbl_guild_member, CSQLParameter::sql_engine)
+		<< sq::RefColumn("char_id",sq::ACTION_CASCADE,sq::ACTION_CASCADE,tbl_char) << sq::Default(0) << sq::Primary()
+		<< sq::RefColumn("guild_id",sq::ACTION_CASCADE,sq::ACTION_CASCADE,tbl_guild) << sq::Default(0) << sq::Primary()
+		<< sq::IntColumn<>("exp",false) << sq::Default(0)
+		<< sq::IntColumn<>("exp_payper",false) << sq::Default(0)
+		<< sq::IntColumn<uint16>("position",false) << sq::Default(0)
+		<< sq::IntColumn<>("rsv1",false) << sq::Default(0)
+		<< sq::IntColumn<>("rsv2",false) << sq::Default(0);
 #endif
 
 	///////////////////////////////////////////////////////////////////////////
@@ -992,11 +1122,10 @@ void CSQLParameter::rebuild()
 	query.clear();
 
 #ifdef DEVELOPING_CSQL
-		db.table(CSQLParameter::tbl_guild_skill)
-			.referenceCol  (tbl_guild["guild_id"],CSQL_CASCADE,CSQL_CASCADE).defaultsTo(0).isPrimary()	.table()
-/*			.intCol<uint16>("id").isNotNull().defaultsTo(0).isPrimary()									.table()
-			.intCol<uint16>("lv").isNotNull().defaultsTo(0)												.table()
-*/			.usingEngine(CSQLParameter::sql_engine);
+	athena << sq::Table(CSQLParameter::tbl_guild_skill, CSQLParameter::sql_engine)
+		<< sq::RefColumn("guild_id",sq::ACTION_CASCADE,sq::ACTION_CASCADE,tbl_guild) << sq::Default(0) << sq::Primary()
+		<< sq::IntColumn<uint16>("id", false) << sq::Default(0) << sq::Primary()
+		<< sq::IntColumn<uint16>("lv", false) << sq::Default(0);
 #endif
 	///////////////////////////////////////////////////////////////////////////
 	query << "CREATE TABLE IF NOT EXISTS `" << dbcon1.escaped(CSQLParameter::tbl_guild_position) << "` "
@@ -1015,13 +1144,12 @@ void CSQLParameter::rebuild()
 	query.clear();
 
 #ifdef DEVELOPING_CSQL
-		db.table(CSQLParameter::tbl_guild_position)
-			.referenceCol  (tbl_guild["guild_id"],CSQL_CASCADE,CSQL_CASCADE).defaultsTo(0).isPrimary()	.table()
-/*			.intCol<uint16>("position").isNotNull().defaultsTo(0).isPrimary()					.table()
-			.textCol       ("name",24).isVariable().isNotNull().defaultsTo("")					.table()
-			.intCol<uint32>("mode").isNotNull().defaultsTo(0)									.table()
-			.intCol<uint32>("exp_mode").isNotNull().defaultsTo(0)								.table()
-*/			.usingEngine(CSQLParameter::sql_engine);
+	athena << sq::Table(CSQLParameter::tbl_guild_position, CSQLParameter::sql_engine)
+		<< sq::RefColumn("guild_id",sq::ACTION_CASCADE,sq::ACTION_CASCADE,tbl_guild) << sq::Default(0) << sq::Primary()
+		<< sq::IntColumn<uint16>("position", false) << sq::Default(0) << sq::Primary()
+		<< sq::TextColumn("name",24,true,false) << sq::Default("")
+		<< sq::IntColumn<>("mode", false) << sq::Default(0)
+		<< sq::IntColumn<>("exp_mode", false) << sq::Default(0);
 #endif
 
 	///////////////////////////////////////////////////////////////////////////
@@ -1040,11 +1168,10 @@ void CSQLParameter::rebuild()
 	query.clear();
 
 #ifdef DEVELOPING_CSQL
-		db.table(CSQLParameter::tbl_guild_alliance)
-			.referenceCol  (tbl_guild["guild_id"],CSQL_CASCADE,CSQL_CASCADE).defaultsTo(0).isPrimary()					.table()
-			.referenceCol  ("alliance_id",tbl_guild["guild_id"],CSQL_CASCADE,CSQL_CASCADE).defaultsTo(0).isPrimary()	.table()
-//			.intCol<uint32>("opposition").isNotNull().defaultsTo(0)														.table()
-			.usingEngine(CSQLParameter::sql_engine);
+	athena << sq::Table(CSQLParameter::tbl_guild_alliance, CSQLParameter::sql_engine)
+		<< sq::RefColumn("guild_id",sq::ACTION_CASCADE,sq::ACTION_CASCADE,tbl_guild) << sq::Default(0) << sq::Primary()
+		<< sq::RefColumn("alliance_id","guild_id",sq::ACTION_CASCADE,sq::ACTION_CASCADE,tbl_guild) << sq::Default(0) << sq::Primary()
+		<< sq::IntColumn<>("opposition", false) << sq::Default(0);
 #endif
 
 	///////////////////////////////////////////////////////////////////////////
@@ -1067,15 +1194,14 @@ void CSQLParameter::rebuild()
 	query.clear();
 
 #ifdef DEVELOPING_CSQL
-		db.table(CSQLParameter::tbl_guild_expulsion)
-			.referenceCol  (tbl_guild["guild_id"],CSQL_CASCADE,CSQL_CASCADE).defaultsTo(0).isPrimary()	.table()
-			.referenceCol  (tbl_char["char_id"],CSQL_CASCADE,CSQL_CASCADE).defaultsTo(0).isPrimary()	.table()
-			.textCol       ("mes",40).isVariable().isNotNull().defaultsTo("")							.table()
-			.textCol       ("acc",40).isVariable().isNotNull().defaultsTo("")							.table()
-/*			.intCol<uint32>("rsv1").isNotNull().defaultsTo(0)											.table()
-			.intCol<uint32>("rsv2").isNotNull().defaultsTo(0)											.table()
-			.intCol<uint32>("rsv3").isNotNull().defaultsTo(0)											.table()
-*/			.usingEngine(CSQLParameter::sql_engine);
+	athena << sq::Table(CSQLParameter::tbl_guild_expulsion, CSQLParameter::sql_engine)
+		<< sq::RefColumn("guild_id",sq::ACTION_CASCADE,sq::ACTION_CASCADE,tbl_guild) << sq::Default(0) << sq::Primary()
+		<< sq::RefColumn("char_id",sq::ACTION_CASCADE,sq::ACTION_CASCADE,tbl_char) << sq::Default(0) << sq::Primary()
+		<< sq::TextColumn("mes",40,true,false) << sq::Default("")
+		<< sq::TextColumn("acc",40,true,false) << sq::Default("")
+		<< sq::IntColumn<>("rsv1",false) << sq::Default(0)
+		<< sq::IntColumn<>("rsv2",false) << sq::Default(0)
+		<< sq::IntColumn<>("rsv3",false) << sq::Default(0);
 #endif
 
 	///////////////////////////////////////////////////////////////////////////
@@ -1099,18 +1225,18 @@ void CSQLParameter::rebuild()
 	query.clear();
 
 #ifdef DEVELOPING_CSQL
-		CSQLTable<basics::CMySQLConnection> &tbl_castle = db.table(CSQLParameter::tbl_castle)
-/*			.intCol<uint16>("castle_id").isNotNull().defaultsTo(0).isPrimary()				.table()
-			.referenceCol  (tbl_guild["guild_id"],CSQL_CASCADE,CSQL_CASCADE).defaultsTo(0)	.table()
-			.intCol<uint32>("economy").isNotNull().defaultsTo(0)							.table()
-			.intCol<uint32>("defense").isNotNull().defaultsTo(0)							.table()
-			.intCol<uint32>("triggerE").isNotNull().defaultsTo(0)							.table()
-			.intCol<uint32>("triggerD").isNotNull().defaultsTo(0)							.table()
-			.intCol<uint32>("nextTime").isNotNull().defaultsTo(0)							.table()
-			.intCol<uint32>("payTime").isNotNull().defaultsTo(0)							.table()
-			.intCol<uint32>("createTime").isNotNull().defaultsTo(0)							.table()
-			.intCol<uint32>("visibleC").isNotNull().defaultsTo(0)							.table()
-*/			.usingEngine(CSQLParameter::sql_engine);
+	basics::string<> tbl_castle(CSQLParameter::tbl_castle);
+	athena << sq::Table(tbl_castle, CSQLParameter::sql_engine)
+		<< sq::IntColumn<uint16>("castle_id") << sq::Default(0) << sq::Primary()
+		<< sq::RefColumn("guild_id",sq::ACTION_CASCADE,sq::ACTION_CASCADE,tbl_guild) << sq::Default(0)
+		<< sq::IntColumn<>("economy",false) << sq::Default(0)
+		<< sq::IntColumn<>("defense",false) << sq::Default(0)
+		<< sq::IntColumn<>("triggerE",false) << sq::Default(0)
+		<< sq::IntColumn<>("triggerD",false) << sq::Default(0)
+		<< sq::IntColumn<>("nextTime",false) << sq::Default(0)
+		<< sq::IntColumn<>("payTime",false) << sq::Default(0)
+		<< sq::IntColumn<>("createTime",false) << sq::Default(0)
+		<< sq::IntColumn<>("visibleC",false) << sq::Default(0);
 #endif
 
 	///////////////////////////////////////////////////////////////////////////
@@ -1128,12 +1254,11 @@ void CSQLParameter::rebuild()
 	query.clear();
 
 #ifdef DEVELOPING_CSQL
-		db.table(CSQLParameter::tbl_castle_guardian)
-			.referenceCol  (tbl_castle["castle_id"],CSQL_CASCADE,CSQL_CASCADE).isPrimary()	.table()
-/*			.intCol<uint32>("guardian_id").isNotNull().defaultsTo(0).isPrimary()			.table()
-			.intCol<uint32>("guardian_hp").isNotNull().defaultsTo(0)						.table()
-*/			.bitCol        ("guardian_visible",1).isNotNull().defaultsTo(0)					.table()
-			.usingEngine(CSQLParameter::sql_engine);
+	athena << sq::Table(tbl_castle_guardian, CSQLParameter::sql_engine)
+		<< sq::RefColumn("castle_id",sq::ACTION_CASCADE,sq::ACTION_CASCADE,tbl_castle) << sq::Default(0) << sq::Primary()
+		<< sq::IntColumn<>("guardian_id",false) << sq::Default(0) << sq::Primary()
+		<< sq::IntColumn<>("guardian_hp",false) << sq::Default(0)
+		<< sq::BitColumn("guardian_visible",1,false) << sq::Default(0);
 #endif
 
 	///////////////////////////////////////////////////////////////////////////
@@ -1154,15 +1279,18 @@ void CSQLParameter::rebuild()
 	dbcon1.PureQuery(query);
 	query.clear();
 
+	query << "SET FOREIGN_KEY_CHECKS=0";
+	dbcon1.PureQuery(query);
+	query.clear();
+
 #ifdef DEVELOPING_CSQL
-		db.table(CSQLParameter::tbl_party)
-/*			.intCol<uint32>("party_id").isNotNull().autoIncrements().isPrimary()			.table()
-			.textCol       ("name",24).isVariable().isNotNull().isUnique().defaultsTo("")	.table()
-			.textCol       ("leader",24).isVariable().isNotNull().isUnique().defaultsTo("")	.table()
-			.intCol<uint16>("expshare").isNotNull().defaultsTo(0)							.table()
-			.intCol<uint16>("itemshare").isNotNull().defaultsTo(0)							.table()
-			.intCol<uint16>("itemc").isNotNull().defaultsTo(0)								.table()
-*/			.usingEngine(CSQLParameter::sql_engine);
+	athena << sq::Table(CSQLParameter::tbl_party, CSQLParameter::sql_engine)
+		<< sq::IntColumn<>("party_id",false) << sq::AutoIncrements(start_party_num) << sq::Primary()
+		<< sq::TextColumn("name",24,true,false) << sq::Unique() << sq::Default("")
+		<< sq::TextColumn("leader",24,true,false) << sq::Unique() << sq::Default("")
+		<< sq::IntColumn<uint16>("expshare",false) << sq::Default(0)
+		<< sq::IntColumn<uint16>("itemshare",false) << sq::Default(0)
+		<< sq::IntColumn<uint16>("itemc",false) << sq::Default(0);
 #endif
 
 	query << "INSERT INTO `" << dbcon1.escaped(CSQLParameter::tbl_party) << "` "
@@ -1199,21 +1327,24 @@ void CSQLParameter::rebuild()
 	dbcon1.PureQuery(query);
 	query.clear();
 
+	query << "SET FOREIGN_KEY_CHECKS=0";
+	dbcon1.PureQuery(query);
+	query.clear();
+	
+
 #ifdef DEVELOPING_CSQL
-		db.table(CSQLParameter::tbl_pet)
-/*			.intCol<uint32>("pet_id").isNotNull().autoIncrements().isPrimary()				.table()
-			.referenceCol  (tbl_char["char_id"],CSQL_CASCADE,CSQL_CASCADE).defaultsTo(0)	.table()
-			.intCol<int16> ("class").isNotNull().defaultsTo(0)								.table()
-			.intCol<int16> ("level").isNotNull().defaultsTo(0)								.table()
-			.intCol<int16> ("egg_id").isNotNull().defaultsTo(0)								.table()
-			.intCol<uint16>("equip_id").isNotNull().defaultsTo(0)							.table()
-			.intCol<uint16>("intimate").isNotNull().defaultsTo(0)							.table()
-			.intCol<int16> ("hungry").isNotNull().defaultsTo(0)								.table()
-			.textCol       ("name",24).isVariable().isNotNull().defaultsTo("")				.table()
-			.intCol<uint8> ("rename_flag").isNotNull().defaultsTo(0)						.table()
-			.intCol<uint8> ("incuvate").isNotNull().defaultsTo(0)							.table()//## "incuvate" -> "incubate" ?
-*/			.usingEngine(CSQLParameter::sql_engine)
-			.autoIncrementsFrom(start_pet_num);
+	athena << sq::Table(CSQLParameter::tbl_pet,CSQLParameter::sql_engine)
+		<< sq::IntColumn<>("pet_id",false) << sq::AutoIncrements(start_pet_num) << sq::Primary()
+		<< sq::RefColumn("char_id",sq::ACTION_CASCADE,sq::ACTION_CASCADE,tbl_char) << sq::Default(0)
+		<< sq::IntColumn<int16>("class",false) << sq::Default(0)
+		<< sq::IntColumn<int16>("level",false) << sq::Default(0)
+		<< sq::IntColumn<int16>("egg_id",false) << sq::Default(0)
+		<< sq::IntColumn<uint16>("equip_id",false) << sq::Default(0)
+		<< sq::IntColumn<uint16>("intimate",false) << sq::Default(0)
+		<< sq::IntColumn<int16>("hungry",false) << sq::Default(0)
+		<< sq::TextColumn("name",24,true,false) << sq::Default("")
+		<< sq::IntColumn<uint8>("rename_flag",false) << sq::Default(0)
+		<< sq::IntColumn<uint8>("incuvate",false) << sq::Default(0);//## "incuvate" -> "incubate" ?
 #endif
 
 	query << "INSERT INTO `" << dbcon1.escaped(CSQLParameter::tbl_pet) << "` "
@@ -1272,43 +1403,45 @@ void CSQLParameter::rebuild()
 	dbcon1.PureQuery(query);
 	query.clear();
 
+	query << "SET FOREIGN_KEY_CHECKS=0";
+	dbcon1.PureQuery(query);
+	query.clear();
+
+
 #ifdef DEVELOPING_CSQL
-		CSQLTable<basics::CMySQLConnection> &tbl_homunculus = db.table(CSQLParameter::tbl_homunculus)
-/*			.intCol<uint32>("hom_id").isNotNull().autoIncrements().isPrimary()					.table()
-			.intCol<uint32>("account_id").isNotNull().defaultsTo(0)								.table()
-			.referenceCol  (tbl_char["char_id"],CSQL_CASCADE,CSQL_CASCADE).defaultsTo(0)		.table()
+	athena << sq::Table(CSQLParameter::tbl_homunculus,CSQLParameter::sql_engine)
+		<< sq::IntColumn<>("hom_id",false) << sq::AutoIncrements(start_homun_num) << sq::Primary()
+		<< sq::IntColumn<>("account_id",false) << sq::Default(0)
+		<< sq::RefColumn("char_id",sq::ACTION_CASCADE,sq::ACTION_CASCADE,tbl_char) << sq::Default(0)
 
-			.intCol<uint32>("base_exp").isNotNull().defaultsTo(0)								.table()
-			.textCol       ("name",24).isVariable().isNotNull().defaultsTo("")					.table()
+		<< sq::IntColumn<>("base_exp",false) << sq::Default(0)
+		<< sq::TextColumn("name",24,true,false) << sq::Default("")
 
-			.intCol<uint32>("hp").isNotNull().defaultsTo(0)										.table()
-			.intCol<uint32>("max_hp").isNotNull().defaultsTo(0)									.table()
-			.intCol<uint32>("sp").isNotNull().defaultsTo(0)										.table()
-			.intCol<uint32>("max_sp").isNotNull().defaultsTo(0)									.table()
+		<< sq::IntColumn<>("hp",false) << sq::Default(0)
+		<< sq::IntColumn<>("max_hp",false) << sq::Default(0)
+		<< sq::IntColumn<>("sp",false) << sq::Default(0)
+		<< sq::IntColumn<>("max_sp",false) << sq::Default(0)
 
-			.intCol<uint16>("class").isNotNull().defaultsTo(0)									.table()
-			.intCol<uint16>("status_point").isNotNull().defaultsTo(0)							.table()
-			.intCol<uint16>("skill_point").isNotNull().defaultsTo(0)							.table()
+		<< sq::IntColumn<uint16>("class",false) << sq::Default(0)
+		<< sq::IntColumn<uint16>("status_point",false) << sq::Default(0)
+		<< sq::IntColumn<uint16>("skill_point",false) << sq::Default(0)
 
-			.intCol<uint16>("str").isNotNull().defaultsTo(0)									.table()
-			.intCol<uint16>("agi").isNotNull().defaultsTo(0)									.table()
-			.intCol<uint16>("vit").isNotNull().defaultsTo(0)									.table()
-			.intCol<uint16>("int").isNotNull().defaultsTo(0)									.table()
-			.intCol<uint16>("dex").isNotNull().defaultsTo(0)									.table()
-			.intCol<uint16>("luk").isNotNull().defaultsTo(0)									.table()
+		<< sq::IntColumn<uint16>("str",false) << sq::Default(0)
+		<< sq::IntColumn<uint16>("agi",false) << sq::Default(0)
+		<< sq::IntColumn<uint16>("vit",false) << sq::Default(0)
+		<< sq::IntColumn<uint16>("int",false) << sq::Default(0)
+		<< sq::IntColumn<uint16>("dex",false) << sq::Default(0)
+		<< sq::IntColumn<uint16>("luk",false) << sq::Default(0)
 
-			.intCol<uint16>("option").isNotNull().defaultsTo(0)									.table()
-			.intCol<uint16>("equip").isNotNull().defaultsTo(0)									.table()
+		<< sq::IntColumn<uint16>("option",false) << sq::Default(0)
+		<< sq::IntColumn<uint16>("equip",false) << sq::Default(0)
 
-			.intCol<uint32>("intimate").isNotNull().defaultsTo(0)								.table()
-			.intCol<int16> ("hungry").isNotNull().defaultsTo(0)									.table()
-			.intCol<uint16>("base_level").isNotNull().defaultsTo(0)								.table()
+		<< sq::IntColumn<>("intimate",false) << sq::Default(0)
+		<< sq::IntColumn<int16>("hungry",false) << sq::Default(0)
+		<< sq::IntColumn<uint16>("base_level",false) << sq::Default(0)
 
-			.intCol<uint8> ("rename_flag").isNotNull().defaultsTo(0)							.table()
-			.intCol<uint8> ("incubate").isNotNull().defaultsTo(0)								.table()
-
-*/			.usingEngine(CSQLParameter::sql_engine)
-			.autoIncrementsFrom(start_homun_num);
+		<< sq::IntColumn<uint8>("rename_flag",false) << sq::Default(0)
+		<< sq::IntColumn<uint8>("incubate",false) << sq::Default(0);
 #endif
 
 	query << "INSERT INTO `" << dbcon1.escaped(CSQLParameter::tbl_homunculus) << "` "
@@ -1336,11 +1469,10 @@ void CSQLParameter::rebuild()
 	query.clear();
 
 #ifdef DEVELOPING_CSQL
-		db.table(CSQLParameter::tbl_homunskill)
-			.referenceCol  (tbl_homunculus["homun_id"],CSQL_CASCADE,CSQL_CASCADE).defaultsTo(0).isPrimary()	.table()
-/*			.intCol<uint16>("id").isNotNull().defaultsTo(0).isPrimary()										.table()
-			.intCol<uint16>("lv").isNotNull().defaultsTo(0)													.table()
-*/			.usingEngine(CSQLParameter::sql_engine);
+	athena << sq::Table(CSQLParameter::tbl_homunskill,CSQLParameter::sql_engine)
+		<< sq::RefColumn("homun_id",sq::ACTION_CASCADE,sq::ACTION_CASCADE,tbl_homunculus) << sq::Default(0) << sq::Primary()
+		<< sq::IntColumn<uint16>("id",false) << sq::Default(0) << sq::Primary()
+		<< sq::IntColumn<uint16>("lv",false) << sq::Default(0);
 #endif
 
 	///////////////////////////////////////////////////////////////////////////
@@ -1360,13 +1492,12 @@ void CSQLParameter::rebuild()
 	query.clear();
 
 #ifdef DEVELOPING_CSQL
-		db.table(CSQLParameter::tbl_homunskill)
-			.textCol       ("name",32).isVariable().isNotNull().defaultsTo(0).isPrimary().isIndexed()	.table()
-/*			.intCol<uint16>("stortype").isNotNull().defaultsTo(0).isPrimary()							.table()
-			.intCol<uint32>("storid").isNotNull().defaultsTo(0).isPrimary().isIndexed()					.table()
-			.intCol<uint16>("vartype").isNotNull().defaultsTo(0)										.table()
-			.intCol<uint16>("value").isNotNull().defaultsTo(0)											.table()
-*/			.usingEngine(CSQLParameter::sql_engine);
+	athena << sq::Table(CSQLParameter::tbl_homunskill,CSQLParameter::sql_engine)
+		<< sq::TextColumn("name",32,true,false) << sq::Default(0) << sq::Primary() << sq::Index()
+		<< sq::IntColumn<uint16>("stortype",false) << sq::Default(0) << sq::Primary()
+		<< sq::IntColumn<>("storid",false) << sq::Default(0) << sq::Primary()
+		<< sq::IntColumn<uint16>("vartype",false) << sq::Default(0)
+		<< sq::IntColumn<uint16>("value",false) << sq::Default(0);
 #endif
 
 	///////////////////////////////////////////////////////////////////////
@@ -1376,19 +1507,13 @@ void CSQLParameter::rebuild()
 	query.clear();
 
 #ifdef DEVELOPING_CSQL
-	}
-	catch(basics::exception &e)
-	{	// Error building the database description
-		printf("CSQLParameter::rebuild(): %s", e.get_message());// Error
-		return;
-	}
-
-	if( CSQLParameter::wipe_sql ){
-		basics::string<> query;
-		db.rebuild();
+	/*
+	if( CSQLParameter::wipe_sql == true ){
+		athena.rebuild();
 	} else {
-		db.verify();
+		athena.verify();
 	}
+	*/
 #endif
 
 }
@@ -4775,6 +4900,5 @@ bool CVarDB_sql::saveVar(const CVar& var)
 
 
 #endif//WITH_MYSQL
-
 
 

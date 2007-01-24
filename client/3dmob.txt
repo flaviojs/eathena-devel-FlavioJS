@@ -1,0 +1,19 @@
++--------+
+| 3dmobs |
++--------+
+
+ data\models\3dmob\<name>_<action pack>.gr2
+--------------------------------------------
+Contains gr2 files with a model, any textures being used and the standby(?) animation.
+
+ data\models\3dmob_bone\<action pack>_<action>.gr2
+---------------------------------------------------
+Contains the animations.
+Valid actions:
+	stand
+	move
+	attack
+	dead
+	damage
+
+As you might have guessed, the <action pack> number identifies which animations a 3dmob uses.

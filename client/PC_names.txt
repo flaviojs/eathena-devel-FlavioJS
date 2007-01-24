@@ -1,0 +1,244 @@
+﻿
+     Player Class Names
+ by FlavioJS @ eAthena 2007
+   (file encoded in UFT8)
+----------------------------
+
+based on an unhexed Sakexe 2006_12_18a
+Note: langtype = valueof(servicetype)
+Note2: MsgStringTable starts at index 0
+
+Default class names:
+	Novice
+	Swordman
+	Magician
+	Archer
+	Acolyte
+	Merchant
+	Thief
+	Knight
+	Priest
+	Wizard
+	Blacksmith
+	Hunter
+	Assassin
+	Crusader
+	Monk
+	Sage
+	Rogue
+	Alchemist
+	Bard
+	Dancer
+	Super Novice
+	Gunslinger
+	Ninja
+	Novice High
+	Swordman High
+	Magician High
+	Archer High
+	Acolyte High
+	Merchant High
+	Thief High
+	Lord Knight
+	High Priest
+	High Wizard
+	Whitesmith
+	Sniper
+	Assassin Cross
+	Paladin
+	Champion
+	Professor
+	Stalker
+	Creator
+	Clown
+	Gypsy
+	Baby
+	Baby Swordman
+	Baby Magician
+	Baby Archer
+	Baby Acolyte
+	Baby Merchant
+	Baby Thief
+	Baby Knight
+	Baby Priest
+	Baby Wizard
+	Baby Blacksmith
+	Baby Hunter
+	Baby Assassin
+	Baby Crusader
+	Baby Monk
+	Baby Sage
+	Baby Rogue
+	Baby Alchemist
+	Baby Bard
+	Baby Dancer
+	Super Baby
+	TaeKwon Boy
+	Star Gladiator
+	Soul Linker
+	Munak
+	Death Knight
+	Dark Collector
+
+if servicetype america (1):
+	Magician -> Mage
+
+if servicetype japan (2):
+	Stalker -> Chaser
+
+if servicetype indonesia (6):
+	Crusader -> Defender
+	Baby Crusader -> Baby Defender
+
+if servicetype korea (0):
+	hmm, i'm not sure if it uses the same defaults :/
+
+------
+
+When packet 0x69 is received:
+
+if female:
+	Munak -> Munak
+if male:
+	Munak -> Bongun
+
+if servicetype korea (0):
+	if female:
+		TaeKwon Boy -> 태권소녀
+	else:
+		TaeKwon Boy -> 태권소년
+	Star Gladiator -> 拳聖
+	Soul Linker -> 소울링커
+else:
+	if female:
+		TaeKwon Boy -> TaeKwon Girl
+	else:
+		TaeKwon Boy -> TaeKwon Boy
+
+if sercivetype brazil (12) or servicetype thai (5) or servicetype indonesia (6):
+	if female:
+		Novice -> MsgStringTable[874]
+		Swordman -> MsgStringTable[875]
+		Magician -> MsgStringTable[876]
+		Archer -> MsgStringTable[877]
+		Acolyte -> MsgStringTable[878]
+		Merchant -> MsgStringTable[879]
+		Thief -> MsgStringTable[880]
+		Knight -> MsgStringTable[881]
+		Priest -> MsgStringTable[882]
+		Wizard -> MsgStringTable[883]
+		Blacksmith -> MsgStringTable[884]
+		Hunter -> MsgStringTable[885]
+		Assassin -> MsgStringTable[886]
+		Crusader -> MsgStringTable[964]
+		Monk -> MsgStringTable[965]
+		Sage -> MsgStringTable[966]
+		Rogue -> MsgStringTable[967]
+		Alchemist -> MsgStringTable[968]
+		Dancer -> MsgStringTable[969]
+		Super Novice -> MsgStringTable[1116]
+		Novice High -> MsgStringTable[977]
+		Swordman High -> MsgStringTable[978]
+		Magician High -> MsgStringTable[979]
+		Archer High -> MsgStringTable[980]
+		Acolyte High -> MsgStringTable[981]
+		Merchant High -> MsgStringTable[982]
+		Thief High -> MsgStringTable[983]
+		Lord Knight -> MsgStringTable[990]
+		High Priest -> MsgStringTable[991]
+		High Wizard -> MsgStringTable[992]
+		Whitesmith -> MsgStringTable[993]
+		Sniper -> MsgStringTable[994]
+		Assassin Cross -> MsgStringTable[995]
+		Paladin -> MsgStringTable[1002]
+		Champion -> MsgStringTable[1003]
+		Professor -> MsgStringTable[1004]
+		Stalker -> MsgStringTable[1005]
+		Creator -> MsgStringTable[1006]
+		Gypsy -> MsgStringTable[1007]
+		TaeKwon Boy -> MsgStringTable[1118]
+		Star Gladiator -> MsgStringTable[1120]
+		Soul Linker -> MsgStringTable[1122]
+	elseif male:
+		Novice -> MsgStringTable[861]
+		Swordman -> MsgStringTable[862]
+		Magician -> MsgStringTable[863]
+		Archer -> MsgStringTable[864]
+		Acolyte -> MsgStringTable[865]
+		Merchant -> MsgStringTable[866]
+		Thief -> MsgStringTable[867]
+		Knight -> MsgStringTable[868]
+		Priest -> MsgStringTable[869]
+		Wizard -> MsgStringTable[870]
+		Blacksmith -> MsgStringTable[871]
+		Hunter -> MsgStringTable[872]
+		Assassin -> MsgStringTable[873]
+		Crusader -> MsgStringTable[958]
+		Monk -> MsgStringTable[959]
+		Sage -> MsgStringTable[960]
+		Rogue -> MsgStringTable[961]
+		Alchemist -> MsgStringTable[962]
+		Bard -> MsgStringTable[963]
+		Super Novice -> MsgStringTable[1115]
+		Novice High -> MsgStringTable[970]
+		Swordman High -> MsgStringTable[971]
+		Magician High -> MsgStringTable[972]
+		Archer High -> MsgStringTable[973]
+		Acolyte High -> MsgStringTable[974]
+		Merchant High -> MsgStringTable[975]
+		Thief High -> MsgStringTable[976]
+		Lord Knight -> MsgStringTable[984]
+		High Priest -> MsgStringTable[985]
+		High Wizard -> MsgStringTable[986]
+		Whitesmith -> MsgStringTable[987]
+		Sniper -> MsgStringTable[988]
+		Assassin Cross -> MsgStringTable[989]
+		Paladin -> MsgStringTable[996]
+		Champion -> MsgStringTable[997]
+		Professor -> MsgStringTable[998]
+		Stalker -> MsgStringTable[999]
+		Creator -> MsgStringTable[1000]
+		Clown -> MsgStringTable[1001]
+		TaeKwon Boy -> MsgStringTable[1117]
+		Star Gladiator -> MsgStringTable[1119]
+		Soul Linker -> MsgStringTable[1121]
+
+if servicetype brazil (12):
+	Baby -> Mini Aprendiz
+	Super Baby -> S.Aprendiz - Jr.
+	Baby Swordman -> Mini Espadachim
+	Baby Bard -> Mini Bardo
+	Baby Dancer -> Mini Odalisca
+	Baby Alchemist -> Mini Alquimista
+	if female:
+		Baby Crusader -> Mini Templária
+		Baby Knight -> Mini Cavaleira
+		Baby Acolyte -> Mini Noviça
+		Baby Priest -> Mini Sacerdotisa
+		Baby Monk -> Mini Monja
+		Baby Archer -> Mini Arqueira
+		Baby Hunter -> Mini Caçadora
+		Baby Magician -> Mini Maga
+		Baby Wizard -> Mini Bruxa
+		Baby Sage -> Mini Sábia
+		Baby Thief -> Mini Gatuna
+		Baby Assassin -> Mini Mercenária
+		Baby Rogue -> Mini Arruaceira
+		Baby Merchant -> Mini Mercadora
+		Baby Blacksmith -> Mini Ferreira
+	else:
+		Baby Crusader -> Mini Templário
+		Baby Knight -> Mini Cavaleiro
+		Baby Acolyte -> Mini Noviço
+		Baby Priest -> Mini Sacerdote
+		Baby Monk -> Mini Monge
+		Baby Archer -> Mini Arqueiro
+		Baby Hunter -> Mini Caçador
+		Baby Magician -> Mini Mago
+		Baby Wizard -> Mini Bruxo
+		Baby Sage -> Mini Sábio
+		Baby Thief -> Mini Gatuno
+		Baby Assassin -> Mini Mercenário
+		Baby Rogue -> Mini Arruaceiro
+		Baby Merchant -> Mini Mercador
+		Baby Blacksmith -> Mini Ferreiro

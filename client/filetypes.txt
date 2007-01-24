@@ -1,0 +1,21 @@
+[2006-12-18] Default filetype to subpath (of data\) associations.
+
+ Type | Subpath
+------+-----------
+  act | sprite\
+  rma | model\
+  gat | ?
+  bmp | texture\
+  tga | texture\
+  jpg | texture\
+  emb | ..\_tmpEmblem\
+  str | texture\effect\
+  gnd | ?
+  inf | inf\
+  rsm | model\
+  rsx | model\
+  gr2 | model\3dmob\
+  pal | palette\
+  spr | sprite\
+  wav | wav\
+  rsw | ?

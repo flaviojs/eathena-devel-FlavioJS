@@ -4,7 +4,6 @@
 #ifndef _SQL_H_
 #define _SQL_H_
 
-#include "baseexceptions.h"
 #include "baseio.h"
 #include "basemysql.h"
 
@@ -14,740 +13,550 @@
 #define DEVELOPING_CSQL
 #ifdef DEVELOPING_CSQL
 
-template <typename T>
-struct typemarker
-{
-	typedef T value_type;
-};
+///////////////////////////////////////////////////////////////////////////////
+NAMESPACE_BEGIN(sq)
+///////////////////////////////////////////////////////////////////////////////
 
-template <typename CON> class CSQLReference;
-template <typename CON> class CSQLColumn;
-template <typename CON> class CSQLTable;
-template <typename CON> class CSQLDatabase;
 
 ///////////////////////////////////////////////////////////////////////////////
-/// Enumeration of SQL column types
-enum CSQLColumnType {
+/// Column type.
+/// TODO 
+enum ColType {
 	// Numeric
-	CSQL_BIT,
-	CSQL_TINYINT,
-	CSQL_SMALLINT,
-	CSQL_MEDIUMINT,
-	CSQL_INT,
-	CSQL_BIGINT,
-	CSQL_FLOATING_POINT,
-	CSQL_FIXED_POINT,
+	BIT,
+	TINYINT,
+	SMALLINT,
+	MEDIUMINT,
+	INT,
+	BIGINT,
+	FLOATING_POINT,
+	FIXED_POINT,
 
 	// Time and Date
-	CSQL_DATE,
-	CSQL_TIME,
-	CSQL_DATETIME,
-	CSQL_TIMESTAMP,
+	DATE,
+	TIME,
+	DATETIME,
+	TIMESTAMP,
 
 	// Text and Bytes
-	CSQL_TEXT,
-	CSQL_BYTES,
-	CSQL_ENUM,
-	CSQL_BITFIELD // SET
+	TEXT,
+	BYTES,
+	ENUM,
+	BITFIELD // SET
 };
 
-/// Enumeration of reference actions
-enum CSQLReferenceAction
+
+///////////////////////////////////////////////////////////////////////////////
+/// Reference actions (for OnDelete and OnUpdate).
+enum RefAction
 {
-	CSQL_ACTIONUNDEFINED,
-	CSQL_RESTRICT,
-	CSQL_CASCADE,
-	CSQL_SETNULL,
-	CSQL_NOACTION,
+	ACTION_UNDEFINED,
+	ACTION_RESTRICT,
+	ACTION_CASCADE,
+	ACTION_SETNULL,
+	ACTION_NOACTION
 };
 
 ///////////////////////////////////////////////////////////////////////////////
-/// Class to know if column type and the signess of integer columns.
-/// TYPE={int8,uint8,int16,uint16,int32,uint32,int64,uint64}
-/// (can't do partial member function specialization /pif)
-template <typename TYPE>
-class CSQLIntCol
+/// The column only contains unique values (might contain several NULL values).
+class Unique
 {
 public:
-	/// Returns the type of the integer column
-	inline static CSQLColumnType type();
-	/// Returns the type of the integer column according to the number of digits
-	inline static CSQLColumnType type(uint32 digits)
-	{
-		return ( digits < 3 ? CSQL_TINYINT :
-				digits < 5 ? CSQL_SMALLINT :
-				digits < 7 ? CSQL_MEDIUMINT :
-				digits < 10 ? CSQL_INT :
-				CSQL_BIGINT );
-	}
-	/// Returns if the integer column is unsigned
-	inline static bool isUnsigned();
+	///////////////////////////////////////////////////////////////////////////
+	/// Constructors
+	Unique(void);
+
+	/// Destructor
+	virtual ~Unique(void);
+};
+
+
+///////////////////////////////////////////////////////////////////////////////
+/// The column is indexed.
+/// TODO multi-column indexes
+class Index
+{
+public:
+	///////////////////////////////////////////////////////////////////////////
+	/// Constructors
+	Index(void);
+
+	/// Destructor
+	virtual ~Index(void);
 };
 
 ///////////////////////////////////////////////////////////////////////////////
-/// SQL foreign key.
-template <typename CON>
-class CSQLReference
+/// Reference.
+/// TODO multi-column references
+class Reference
 {
-	friend class CSQLReference<CON>;
-	friend class CSQLColumn<CON>;
-	friend class CSQLTable<CON>;
-	friend class CSQLDatabase<CON>;
+public:
+	///////////////////////////////////////////////////////////////////////////
+	/// Constructors
+	Reference(const basics::string<> &from, const basics::string<> &to, RefAction onDel, RefAction onUp, const basics::string<> &tbl);
 
-	/// Parent table.
-	CSQLTable<CON> &tbl;
+	/// Destructor
+	virtual ~Reference(void);
 
-	/// Target table.
-	CSQLTable<CON> &target;
+	///////////////////////////////////////////////////////////////////////////
+	/// Returns the action on delete
+	inline const RefAction& onDel(void) const;
 
-	/// Map of column references.
-	basics::map< const CSQLColumn<CON> *, CSQLColumn<CON> * > refs;
+	/// Returns the action on update
+	inline const RefAction& onUp(void) const;
 
-	/// temporary from column.
-	CSQLColumn<CON> *from_;
+	/// Returns the action on update
+	inline const basics::string<>& table(void) const;
 
-	/// Action on delete
-	CSQLReferenceAction onDel;
+private:
+	///////////////////////////////////////////////////////////////////////////
+	/// Action on delete.
+	const RefAction ref_onDel;
 
 	/// Action on update
-	CSQLReferenceAction onUp;
+	const RefAction ref_onUp;
 
-	///////////////////////////////////////////////////////////////////////////
-	/// Constructor.
-	CSQLReference(CSQLTable<CON> &tbl, CSQLTable<CON> &target)
-		: tbl(tbl)
-		, target(target)
-		, from_(NULL)
-	{
-		onDel = CSQL_ACTIONUNDEFINED;
-		onUp = CSQL_ACTIONUNDEFINED;
-	}
+	/// Target table
+	basics::string<> ref_tbl;
 
-public:
+	/// From columns
+	basics::vector< basics::string<> > ref_from;
 
-	///////////////////////////////////////////////////////////////////////////
-	/// Returns the parent table.
-	CSQLTable<CON> &table()	{ return *tbl; }
-
-	/// Returns the parent database.
-	CSQLDatabase<CON> &db()	{ return *tbl->db_; }
-
-	///////////////////////////////////////////////////////////////////////////
-	/// Sets the from column.
-	CSQLReference<CON> &from(CSQLColumn<CON> &col)
-	{
-		if( &col.tbl != &tbl )
-			printf("CSQLReference: From column '%s.%s' does not belong to table '%s'.",
-				col.tbl.name, col.name, tbl.name);// Warning
-		else if( from_ )
-			printf("CSQLReference: Expecting a to column for '%s.%s', discarting from column '%s.%s'.",
-					tbl.name, from_->name, col.tbl.name, col.name);// Warning
-		else if( refs.exists(&col) )
-			printf("CSQLReference: From column '%s.%s' is already referenced, ignoring.");// Warning
-		else
-			from_ = &col;
-		return *this;
-	}
-	/// Sets the from column.
-	CSQLReference<CON> &from(const basics::string<> &col)
-	{
-		if( tbl->cols.exists(col) )
-			return from(*tbl->cols[col]);
-		printf("CSQLReference: From column '%s.%s' does not exist, ignoring.",
-				tbl->name, col);// Warning
-		return *this;
-	}
-
-	///////////////////////////////////////////////////////////////////////////
-	/// Sets the to column.
-	CSQLReference<CON> &to(CSQLColumn<CON> &col)
-	{
-		if( &col.tbl != &target )
-			printf("CSQLReference: To column '%s.%s' does not belong to table '%s'.",
-				col.tbl.name, col.name, target.name);// Warning
-		else if( !from_ )
-			printf("CSQLReference: From column undefined for table '%s', discarting to column '%s.%s'.",
-					tbl.name, col.tbl.name, col.name);// Warning
-		else
-		{
-			refs.insert(from_,&col);
-			from_ = NULL;
-		}
-		return *this;
-	}
-	/// Sets the to column.
-	CSQLReference<CON> &to(const basics::string<> &col)
-	{
-		if( target->cols.exists(col) )
-			return to((*target)[col]);
-		printf("CSQLReference: To column '%s.%s' does not exist, ignoring (table '%s').",
-				target->name, col, tbl->name);// Warning
-		return *this;
-	}
-
-	///////////////////////////////////////////////////////////////////////////
-	/// Sets a reference of columns of the same name.
-	CSQLReference<CON> &cols(const basics::string<> &col)	{ return from(col).to(col);	}
-
-	///////////////////////////////////////////////////////////////////////////
-	/// Sets the on delete action
-	CSQLReference<CON> &onDelete(CSQLReferenceAction action)	{ onDel = action; return *this; }
-
-	/// Sets the on update action
-	CSQLReference<CON> &onUpdate(CSQLReferenceAction action)	{ onUp = action; return *this; }
-
+	/// To columns
+	basics::vector< basics::string<> > ref_to;
 };
 
+
 ///////////////////////////////////////////////////////////////////////////////
-/// SQL column definition.
-//## maybe break up into objects by the column base type
-template <typename CON>
-class CSQLColumn
+/// Property.
+/// TODO 
+template< typename T >
+class Property : public basics::defaultcmp
 {
-	friend class CSQLReference<CON>;
-	friend class CSQLColumn<CON>;
-	friend class CSQLTable<CON>;
-	friend class CSQLDatabase<CON>;
-
-	/// Parent table.
-	CSQLTable<CON> &tbl;
-
-	/// Column type.
-	CSQLColumnType type_;
-
-	/// Column name.
-	basics::string<> name;
-
-	/// Default value of the column
-	basics::string<> default_;
-	/// The status of the default_ variable.
-	enum {
-		DEF_UNDEFINED,
-		DEF_DEFINED,
-		DEF_NULL
-	} defaultStatus;
-
-	/// If this column is part of the primary key.
-	bool primary;
-
-	/// If this column is nullable.
-	bool nullable;
-
-	/// If this column is indexed.
-	bool indexed;
-
-	/// If this column only contains unique values.
-	/// The behaviour for NULL values depends on the table engine being used.
-	bool unique;
-
-	/// Column properties
-	union {
-
-		/// Text and byte column properties
-		struct {
-			bool variable; // If the column has variable size
-		} textByte;
-
-		/// Numeric column properties
-		struct {
-			bool unsigned_; // If the column is unsigned.
-		} numeric;
-
-		/// Enum and bitfield columns
-		basics::vector< basics::string<> > *values;
-
-	} prop;
-
-	/// Column reference. (aka FOREIGN KEY)
-	CSQLColumn<CON> *refTo;
-
-	/// Columns using this column as reference.
-	basics::vector< CSQLColumn<CON> * > refFrom;
-
-	///
-	uint32 val1;
-
-	///
-	uint32 val2;
-
-	///////////////////////////////////////////////////////////////////////////
-	/// Constructors.
-	/// the meaning of val1 and val2 depend on the type of column
-	CSQLColumn(CSQLTable<CON> &tbl, CSQLColumnType type, const basics::string<> &name,
-			uint32 val1=UINT32_MAX, uint32 val2=UINT32_MAX)
-		: tbl(tbl), type_(type), name(name)
-	{
-		init(val1,val2);
-	}
-
-	/// Creates a copy of another column to be referenced
-	/// Assumes the column is valid
-	CSQLColumn(CSQLTable<CON> &tbl, CSQLColumn<CON> &col, const basics::string<> &name)
-		: tbl(tbl), type_(col.type_), name(name)
-	{
-		copy(col);
-	}
-
-	/// Destructor.
-	~CSQLColumn()
-	{
-		if( containsValues() )
-			delete prop.values;
-	}
-
-	///////////////////////////////////////////////////////////////////////////
-	/// Load the column defaults.
-	void init(uint32 val1,uint32 val2)
-	{
-		defaultStatus = DEF_UNDEFINED;
-		this->val1 = val1;
-		this->val2 = val2;
-		primary = false;
-		nullable = true;
-		indexed = false;
-		unique = false;
-		refTo = NULL;
-		if( isTextByte() )
-			prop.textByte.variable = false;
-		else if( isNumeric() )
-			prop.numeric.unsigned_ = false;
-		else if( containsValues() )
-			prop.values = new basics::vector< basics::string<> >();
-	}
-
-	/// Copy the data of the column (for column references)
-	void copy(CSQLColumn<CON> &col)
-	{
-		defaultStatus = col.defaultStatus;
-		default_ = col.default_;
-		val1 = col.val1;
-		val2 = col.val2;
-		primary = false;
-		nullable = col.nullable;
-		indexed = true;
-		unique = col.unique;
-		refTo = NULL;
-		if( isTextByte() )
-			prop.textByte.variable = col.prop.textByte.variable;
-		else if( isNumeric() )
-			prop.numeric.unsigned_ = col.prop.numeric.unsigned_;
-		else if( containsValues() )
-			prop.values = new basics::vector< basics::string<> >(*col.prop.values);
-		default_ = col.default_;
-	}
-
-	bool containsValues()	{ return type_ == CSQL_ENUM || type_ == CSQL_BITFIELD; }
-	bool isTextByte()		{ return type_ == CSQL_TEXT || type_ == CSQL_BYTES; }
-	bool isNumeric()		{ return type_ >= CSQL_BIT && type_ <= CSQL_FIXED_POINT; }
-
 public:
-
 	///////////////////////////////////////////////////////////////////////////
-	// All column types
+	/// Constructors
+	Property(void); // required for a vector of properties
+	Property(const basics::string<>& name, const basics::string<>& value);
 
-	/// Sets the default value.
-	/// The value is converted to a string.
-	template <typename TYPE>
-	CSQLColumn<CON> &defaultsTo(TYPE val)	{ defaultStatus = DEF_DEFINED; default_.clear(); default_ << val; return *this; }
-	CSQLColumn<CON> &defaultsToNull()		{ defaultStatus = DEF_NULL; default_.clear(); return *this; }
-
-	/// Sets this column as not null.
-	CSQLColumn<CON> &isNotNull()	{ nullable = false; return *this; }
-
-	/// Includes this column in the primary key
-	/// isNotNull() is invoked automatically
-	CSQLColumn<CON> &isPrimary()	{ return tbl.setPrimary(*this); }
-
-	/// Sets this column as indexed.
-	CSQLColumn<CON> &isIndexed()	{ indexed = true; return *this; }
-
-	/// Sets this column as unique.
-	CSQLColumn<CON> &isUnique()	{ unique = true; return *this; }
-
-	/// Create a reference from this column to another
-	/// The column is automatically indexed
-	CSQLReference<CON> &refersTo(CSQLColumn<CON> &col)
-	{
-		return tbl.references(col.tbl).from(*this).to(col);
-	}
-
-	///////////////////////////////////////////////////////////////////////////
-	// Text and bytes column types
-
-	/// Sets the size of this text or bytes column as variable.
-	CSQLColumn<CON> &isVariable()
-	{
-		if( isTextByte() )
-			prop.textByte.variable = true;
-		else
-			printf("CSQLColumn: Column '%s.%s' can't be variable.", tbl.name, name);// Warning
-		return *this;
-	}
-
-	/// Sets this column as auto-incrementable
-	CSQLColumn<CON> &autoIncrements()
-	{
-		return tbl.setAutoInc(*this);
-	}
-	template <typename TYPE>
-	CSQLColumn<CON> &autoIncrements(TYPE val)
-	{
-		return tbl.setAutoInc<TYPE>(*this, val);
-	}
-
-	///////////////////////////////////////////////////////////////////////////
-	// Enum/bitfield columns
-
-	/// Adds a value to this enum/bitfield column.
-	/// The value is converted to a string.
-	template <typename TYPE>
-	CSQLColumn<CON> &has(TYPE val)
-	{
-		if( containsValues() )
-		{
-			basics::string<> str;
-			basics::vector< basics::string<> >::iterator it(*prop.values);
-
-			// check for empty string (always enum value 0)
-			str << val;
-			if( type_ == CSQL_ENUM && str.length() == 0 )
-				return *this;
-
-			// check for duplicates
-			for( ; it ; ++it )
-			{
-				if( *it == str )
-				{
-					printf("CSQLColumn: Column '%s.%s' already contains \"%s\".", tbl.name, name, str);// Warning
-					return *this;
-				}
-			}
-
-			// check for space (bitfield can have 64 values, enum 65535)
-			if( prop.values->size() >= 64 && (type_ == CSQL_BITFIELD ||
-					(prop.values->size() == 65535 && type_ == CSQL_ENUM)) )
-			{
-				printf("CSQLColumn: Column '%s.%s' is full, ignoring \"%s\".", tbl.name, name, str);// Warning
-				return *this;
-			}
-			prop.values->append(str);
-		}
-		else
-			printf("CSQLColumn: Column '%s.%s' can't ´contain values.", tbl.name, name);// Warning
-		return *this;
-	}
-
-	///////////////////////////////////////////////////////////////////////////
-	/// Returns the parent table.
-	CSQLTable<CON> &table()	{ return tbl; };
-
-	/// Returns the parent database.
-	CSQLDatabase<CON> &db()	{ return tbl.db_; };
-
-};
-
-///////////////////////////////////////////////////////////////////////////////
-/// SQL table definition.
-/// Needs to have at least 1 column
-template <typename CON>
-class CSQLTable
-{
-	friend class CSQLReference<CON>;
-	friend class CSQLColumn<CON>;
-	friend class CSQLTable<CON>;
-	friend class CSQLDatabase<CON>;
-
-	/// Parent database.
-	CSQLDatabase<CON> &db_;
-
-	/// Name of the table.
-	const basics::string<> name;
-
-	/// Map of table columns.
-	basics::map<basics::string<>, CSQLColumn<CON> * > cols;
-
-	/// Vector of primary key columns.
-	basics::vector< CSQLColumn<CON> * > primary;
-
-	/// Vector of table references.
-	basics::vector< CSQLReference<CON> * > refs;
-
-	/// Table engine.
-	basics::string<> engine;
-
-	/// Auto-incrementable column. Only one per table.
-	struct _autoInc {
-		CSQLColumn<CON> *col;
-		basics::string<> start;
-	} autoInc;
-
-	///////////////////////////////////////////////////////////////////////////
-	/// Constructor.
-	/// @param db Database object
-	/// @param name Table name
-	CSQLTable<CON>(CSQLDatabase<CON> &db, const basics::string<> &name)
-		: db_(db)
-		, name(name)
-	{
-		autoInc.col = NULL;
-	}
 	/// Destructor
-	/// Deletes the columns.
-	~CSQLTable<CON>()
-	{
-		// delete columns
-		typename basics::map<basics::string<>, CSQLColumn<CON> * >::iterator it(cols);
-		for( ; it ; ++it )
-			delete it->data;
-		cols.clear();
-	}
+	virtual ~Property(void);
 
 	///////////////////////////////////////////////////////////////////////////
-	/// Inserts a column in this table and returns the column.
-	CSQLColumn<CON> &insert(const basics::string<> &name, CSQLColumn<CON> *col)
-	{
-		if( cols.exists(name) )
-		{
-			printf("CSQLTable: Column '%s.%s' already exists, using previous definition.");// Warning
-			delete col;
-			return *cols[name];
-		}
-		cols.insert(name,col);
-		return *col;
-	}
+	/// Name of the property
+	inline const basics::string<>& name(void);
 
-	/// Adds the column to the primary key.
-	/// Sets column not null.
-	CSQLColumn<CON> &setPrimary(CSQLColumn<CON> &col)
-	{
-		if( !col.primary )
-		{
-			col.primary = true;
-			primary.append(&col);
-			return col.isNotNull(); // Primary keys can't be NULL
-		}
-		return col;
-	}
+	/// Value of the property
+	inline const basics::string<>& value(void);
 
-	/// Sets the auto-incrementable column.
-	CSQLColumn<CON> &setAutoInc(CSQLColumn<CON> &col)
-	{
-		if( autoInc.col )
-			printf("CSQLTable: Column '%s.%s' is already auto-incrementable, ignoring '%s.%s'.",
-					name, autoInc.col->name, name, col.name);// Warning
-		else
-			autoInc.col = &col;
-		return col;
-	}
-	/// Sets the auto-incrementable column.
-	template <typename TYPE>
-	CSQLColumn<CON> &setAutoInc(CSQLColumn<CON> &col, TYPE val)
-	{
-		if( autoInc.col )
-			printf("CSQLTable: Column '%s.%s' is already auto-incrementable, ignoring '%s.%s'.",
-					name, autoInc.col->name, name, col.name);// Warning
-		else
-		{
-			autoInc.col = &col;
-			autoIncrementsFrom(val);
-		}
-		return col;
-	}
+private:
+	///////////////////////////////////////////////////////////////////////////
+	/// Name of the property
+	basics::string<> prop_name;
+
+	/// Value of the property
+	basics::string<> prop_value;
+};
+
+
+///////////////////////////////////////////////////////////////////////////////
+/// Identifies a primary column
+class AutoIncrements
+{
 public:
+	///////////////////////////////////////////////////////////////////////////
+	/// Constructor
+	AutoIncrements(const uint32 from);
+
+	/// Destructor
+	virtual ~AutoIncrements(void);
 
 	///////////////////////////////////////////////////////////////////////////
-	/// Returns the parent database.
-	CSQLDatabase<CON> &db()	{ return db; }
+	/// Returns the starting index
+	inline const uint32 from(void) const;
 
-	/// Sets the table engine (InnoDB/MyISAM/...).
-	CSQLTable<CON> &usingEngine(const basics::string<> &engine)	{ this->engine = engine; return *this; }
+private:
+	///////////////////////////////////////////////////////////////////////////
+	/// Starting index
+	const uint32 inc_from;
+};
 
-	/// Sets the starting value of the auto-incrementing column.
-	template <typename TYPE>
-	CSQLTable<CON> &autoIncrementsFrom(TYPE val)
-	{
-		if( autoInc.col )
-		{
-			autoInc.start.clear();
-			autoInc.start << val;
-		}
-		else
-			printf("CSQLTable: Auto-incrementable column is undefined in table '%s', ignoring value.", name);// Warning
-		return *this;
-	}
+
+///////////////////////////////////////////////////////////////////////////////
+/// Identifies a primary column
+class Default
+{
+public:
+	///////////////////////////////////////////////////////////////////////////
+	/// Constructor
+	Default(const uint32 value);
+	Default(const basics::string<>& value);
+
+	/// Destructor
+	virtual ~Default(void);
 
 	///////////////////////////////////////////////////////////////////////////
-	/// Create a new table reference. (aka, foreign key)
-	CSQLReference<CON> &references(CSQLTable<CON> &target)
-	{
-		CSQLReference<CON> *ref = new CSQLReference<CON>(*this,target);
-		refs.insert(ref);
-		return *ref;
-	}
-	CSQLReference<CON> &references()	{ return references(*this); }
+	/// Returns the starting index
+	inline const basics::string<>& value(void) const;
+
+private:
+	///////////////////////////////////////////////////////////////////////////
+	/// Start of string
+	basics::string<> def_value;
+};
+
+
+///////////////////////////////////////////////////////////////////////////////
+/// Identifies a primary column
+class Primary
+{
+public:
+	///////////////////////////////////////////////////////////////////////////
+	/// Constructor
+	Primary(void);
+
+	/// Destructor
+	virtual ~Primary(void);
+};
+
+
+///////////////////////////////////////////////////////////////////////////////
+/// Column
+/// TODO 
+class Column : public basics::defaultcmp
+{
+public:
+	///////////////////////////////////////////////////////////////////////////
+	/// Constructors
+	Column(ColType type, const basics::string<>& name, bool null=true);
+
+	/// Destructor
+	virtual ~Column(void);
 
 	///////////////////////////////////////////////////////////////////////////
-	// Numeric types
-	CSQLColumn<CON> &bitCol(const basics::string<> &name, uint32 bits)		{ return insert(name,new CSQLColumn<CON>(*this,CSQL_BIT,name,bits)); }
-	template <typename TYPE>
-	CSQLColumn<CON> &intCol(const basics::string<> &name, const typemarker<TYPE>&)
-	{
-		CSQLColumn<CON> &col = insert(name,new CSQLColumn<CON>(*this,CSQLIntCol<TYPE>::type(),name));
-		col.prop.numeric.unsigned_ = CSQLIntCol<TYPE>::isUnsigned();
-		return col;
-	}
-	template <typename TYPE>
-	CSQLColumn<CON> &intCol(const basics::string<> &name, uint32 digits, const typemarker<TYPE>&)
-	{
-		CSQLColumn<CON> &col = insert(name,new CSQLColumn<CON>(*this,CSQLIntCol<TYPE>::type(digits),name,digits));
-		col.prop.numeric.unsigned_ = CSQLIntCol<TYPE>::isUnsigned();
-		return col;
-	}
+	/// sets the default value of this column.
+	Column& operator<<(Primary& pri);
 
-	// Floating-point types
-	template <typename X>
-	CSQLColumn<CON> &floatingPointCol(const basics::string<> &name, const typemarker<X>&); // [0,24] bits -> FLOAT , [25,53] bits -> DOUBLE
-	CSQLColumn<CON> &floatingPointCol(const basics::string<> &name, uint32 bits)					{ return insert(name,new CSQLColumn<CON>(*this,CSQL_FLOATING_POINT,name,bits)); }
-	CSQLColumn<CON> &floatingPointCol(const basics::string<> &name, uint32 digits, uint32 decimals)	{ return insert(name,new CSQLColumn<CON>(*this,CSQL_FLOATING_POINT,name,digits,decimals)); }
-
-	// Fixed-point types
-	CSQLColumn<CON> &fixedPointCol(const basics::string<> &name)									{ return insert(name,new CSQLColumn<CON>(*this,CSQL_FIXED_POINT,name)); }
-	CSQLColumn<CON> &fixedPointCol(const basics::string<> &name, uint32 digits)						{ return insert(name,new CSQLColumn<CON>(*this,CSQL_FIXED_POINT,name,digits)); }
-	CSQLColumn<CON> &fixedPointCol(const basics::string<> &name, uint32 digits, uint32 decimals)	{ return insert(name,new CSQLColumn<CON>(*this,CSQL_FIXED_POINT,name,digits,decimals)); }
+	/// sets the default value of this column.
+	Column& operator<<(Default& value);
 
 	///////////////////////////////////////////////////////////////////////////
-	// Date and Time types
-	CSQLColumn<CON>      &dateCol(const basics::string<> &name)	{ return insert(name,new CSQLColumn<CON>(*this,CSQL_DATE,name)); }
-	CSQLColumn<CON>      &timeCol(const basics::string<> &name)	{ return insert(name,new CSQLColumn<CON>(*this,CSQL_TIME,name)); }
-	CSQLColumn<CON>  &datetimeCol(const basics::string<> &name)	{ return insert(name,new CSQLColumn<CON>(*this,CSQL_DATETIME,name)); }
-	CSQLColumn<CON> &timestampCol(const basics::string<> &name)	{ return insert(name,new CSQLColumn<CON>(*this,CSQL_TIMESTAMP,name)); }
+	/// Returns the name of the table
+	inline const basics::string<>& name() const;
 
 	///////////////////////////////////////////////////////////////////////////
-	// Text and Byte types
-	CSQLColumn<CON>     &textCol(const basics::string<> &name)					{ return insert(name,new CSQLColumn<CON>(*this,CSQL_TEXT,name)); }
-	CSQLColumn<CON>     &textCol(const basics::string<> &name, uint32 length)	{ return insert(name,new CSQLColumn<CON>(*this,CSQL_TEXT,name,length)); }
-	CSQLColumn<CON>     &byteCol(const basics::string<> &name)					{ return insert(name,new CSQLColumn<CON>(*this,CSQL_BYTES,name)); }
-	CSQLColumn<CON>     &byteCol(const basics::string<> &name, uint32 length)	{ return insert(name,new CSQLColumn<CON>(*this,CSQL_BYTES,name,length)); }
-	CSQLColumn<CON>     &enumCol(const basics::string<> &name)					{ return insert(name,new CSQLColumn<CON>(*this,CSQL_ENUM,name)); }
-	CSQLColumn<CON> &bitfieldCol(const basics::string<> &name)					{ return insert(name,new CSQLColumn<CON>(*this,CSQL_BITFIELD,name)); }
+	/// Returns the name of the table
+	inline ColType type() const;
+
+	/// Returns if a default value has been assigned
+	inline bool hasDefault() const;
+
+	/// Returns the default value
+	inline const basics::string<>& defaultsTo() const;
+
+	/// Returns if the column can have NULL values
+	inline bool null() const;
+
+private:
+	///////////////////////////////////////////////////////////////////////////
+	/// type
+	ColType col_type;
+
+	/// name
+	basics::string<> col_name;
+
+	/// If the column can have NULL values
+	bool col_null;
+
+	/// if col_default has been defined
+	bool col_hasDefault;
+
+	/// default value
+	basics::string<> col_default;
+};
+
+
+///////////////////////////////////////////////////////////////////////////////
+/// Int column.
+/// TINYINT, SMALLINT, MEDIUMINT, INT, BIGINT
+/// T = { int8, uint8, int16, uint16, int32, uint32, int64, uint64 }
+template < typename T = uint32 >
+class IntColumn : public Column
+{
+public:
+	///////////////////////////////////////////////////////////////////////////
+	/// Constructors
+	IntColumn(const basics::string<>& name, bool null=true);
+	IntColumn(const basics::string<>& name, uint32 digits, bool null=true);
+
+	/// Destructor
+	virtual ~IntColumn();
+};
+
+
+///////////////////////////////////////////////////////////////////////////////
+/// Text Column
+class TextColumn : public Column
+{
+public:
+	///////////////////////////////////////////////////////////////////////////
+	/// Constructors
+	TextColumn(const basics::string<>& name, bool variable, bool null=true);
+	TextColumn(const basics::string<>& name, uint32 size, bool variable, bool null=true);
+
+	/// Destructor
+	virtual ~TextColumn();
+};
+
+
+///////////////////////////////////////////////////////////////////////////////
+/// Byte Column
+class ByteColumn : public Column
+{
+public:
+	///////////////////////////////////////////////////////////////////////////
+	/// Constructors
+	ByteColumn(const basics::string<>& name, bool null=true);
+	ByteColumn(const basics::string<>& name, uint32 size, bool null=true);
+
+	/// Destructor
+	virtual ~ByteColumn();
+};
+
+
+///////////////////////////////////////////////////////////////////////////////
+/// Enum Column
+class EnumColumn : public Column
+{
+public:
+	///////////////////////////////////////////////////////////////////////////
+	/// Constructors - add more as needed
+	EnumColumn(const basics::string<>& name, const basics::string<>& val1, const basics::string<>& val2, const basics::string<>& val3);
+
+	/// Destructor
+	virtual ~EnumColumn();
+};
+
+
+///////////////////////////////////////////////////////////////////////////////
+/// Bit Column
+class BitColumn : public Column
+{
+public:
+	///////////////////////////////////////////////////////////////////////////
+	/// Constructors
+	BitColumn(const basics::string<>& name, uint32 size, bool null=true);
+
+	/// Destructor
+	virtual ~BitColumn();
+};
+
+
+///////////////////////////////////////////////////////////////////////////////
+/// Foreign Reference Column
+class RefColumn : public Column, public Reference
+{
+public:
+	///////////////////////////////////////////////////////////////////////////
+	/// Constructors
+	RefColumn(const basics::string<>& name, RefAction onDel, RefAction onUp, const basics::string<>& ref_tbl);
+	RefColumn(const basics::string<>& name, const basics::string<>& ref_col, RefAction onDel, RefAction onUp);
+	RefColumn(const basics::string<>& name, const basics::string<>& ref_col, RefAction onDel, RefAction onUp, const basics::string<>& ref_tbl);
+
+	/// Destructor
+	virtual ~RefColumn();
 
 	///////////////////////////////////////////////////////////////////////////
-	/// Creates a copy of another column, automatically creating a reference to it
-	/// The column is automatically indexed
-	CSQLColumn<CON> &referenceCol(const basics::string<> &alias, CSQLColumn<CON> &col, CSQLReferenceAction onDel=CSQL_ACTIONUNDEFINED, CSQLReferenceAction onUp=CSQL_ACTIONUNDEFINED)
-		throw(basics::exception)
-	{
-		CSQLColumn<CON> *newCol;
-		if( &db_ != &col.tbl.db_ )
-		{// wrong database
-			basics::string<> err;
-			err << "CSQLTable: Column '" << col.tbl.name << "." << col.name
-				<< "' doesn't belong to the same database, aborting reference from '"
-				<< name << "." << alias << "'.";
-			throw basics::exception(err);
-		}
-		else if( cols.exists(alias) )
-		{// alrady exists
-			printf("CSQLTable: Column '%s.%s' already exists, creating reference to '%s.%s'",
-					name, alias, col.tbl.name, col.name);// Warning
-			newCol = cols[alias];
-		}
-		else
-			newCol = new CSQLColumn<CON>(*this,col,alias);
-		newCol->refersTo(col).onDelete(onDel).onUpdate(onUp);
-		return *newCol;
-	}
-	CSQLColumn<CON> &referenceCol(CSQLColumn<CON> &col, CSQLReferenceAction onDel=CSQL_ACTIONUNDEFINED, CSQLReferenceAction onUp=CSQL_ACTIONUNDEFINED)
-		throw(basics::exception)
-	{ return referenceCol(col.name,col,onDel,onUp); }
+	/// Returns if the reference point to the table of this column
+	bool sameTable(void) const;
+
+private:
+	///////////////////////////////////////////////////////////////////////////
+	// If it's a reference to the same table.
+	bool ref_sameTable;
+};
+
+
+///////////////////////////////////////////////////////////////////////////////
+/// Table.
+/// Collection of columns, properties,references and indexes.
+class Table : public basics::defaultcmp
+{
+public:
+	Table();
+	Table& operator=(const Table& tbl);
+
+public:
+	///////////////////////////////////////////////////////////////////////////
+	/// Constructor
+	Table(const basics::string<>& name);
+	Table(const basics::string<>& name, const basics::string<>& engine);
+
+	/// Destructor
+	virtual ~Table();
 
 	///////////////////////////////////////////////////////////////////////////
-	/// Retrieves a child column.
-	/// @param name Column name
-	CSQLColumn<CON> &operator[](const basics::string<> &name) throw(basics::exception)
-	{
-		if( cols.exists(name) )
-			return *cols[name];
-		else
-		{
-			basics::string<> err;
-			err << "CSQLTable: Column '" << name << "' not found.";
-			throw basics::exception(err);
-		}
-	}
+	/// Returns the name of the table.
+	inline const basics::string<>& name() const;
+
+	///////////////////////////////////////////////////////////////////////////
+	/// Adds a column.
+	Table& operator<<(Column& col);
+
+	/// Adds an int column.
+	template < typename TT >
+	Table& operator<<(IntColumn< TT >& col);
+
+	/// Adds a text column.
+	Table& operator<<(TextColumn& col);
+
+	/// Adds a byte column.
+	Table& operator<<(ByteColumn& col);
+
+	/// Adds an enum column.
+	Table& operator<<(EnumColumn& col);
+
+	/// Adds a bit column.
+	Table& operator<<(BitColumn& col);
+
+	/// Adds a reference column.
+	Table& operator<<(RefColumn& col);
+
+private:
+	///////////////////////////////////////////////////////////////////////////
+	/// name
+	const basics::string<> tbl_name;
+
+	/// columns
+	basics::vector< Column* > tbl_cols;
+
+	/// properties
+	basics::vector< Property< Table >* > tbl_props;
+
+	/// references
+	basics::vector< Reference* > tbl_refs;
+
+	/// indexes
+	basics::vector< Index* > tbl_idxs;
+};
+
+
+///////////////////////////////////////////////////////////////////////////////
+/// Table copy.
+class CopyTable : Table
+{
+public:
+	///////////////////////////////////////////////////////////////////////////
+	/// Constructors
+	CopyTable(const basics::string<>& name, const basics::string<>& copy_name);
+	CopyTable(const basics::string<>& name, const basics::string<>& copy_name, const basics::string<>& engine);
+
+	/// Destructor
+	virtual ~CopyTable();
+
+	///////////////////////////////////////////////////////////////////////////
+	/// Returns the name of the copied table
+	const basics::string<>& copy_name(void);
+
+private:
+	///////////////////////////////////////////////////////////////////////////
+	/// name of the table to copy
+	basics::string<> tbl_copy_name;
 
 };
 
+
 ///////////////////////////////////////////////////////////////////////////////
-/// SQL database definition.
-/// Contains tables.
-template <typename CON>
-class CSQLDatabase
+/// Database.
+/// Collection of tables and properties.
+/// TODO table/property access
+class Database
 {
-	friend class CSQLReference<CON>;
-	friend class CSQLColumn<CON>;
-	friend class CSQLTable<CON>;
-	friend class CSQLDatabase<CON>;
-
-	/// Database connection.
-	CON &con;
-
-	/// Map of database tables.
-	basics::map< basics::string<>, CSQLTable<CON> * > tables;
-
 public:
 	///////////////////////////////////////////////////////////////////////////
 	/// Constructor.
-	/// @param conn Database connection
-	CSQLDatabase(CON &con)
-		: con(con)
-	{ }
+	Database() {}
 
 	/// Destructor.
-	/// Deletes the tables.
-	~CSQLDatabase()
-	{
-		typename basics::map< basics::string<>, CSQLTable<CON> * >::iterator it(tables);
-		for( ; it ; ++it )
-			delete it->data;
-		tables.clear();
-	}
+	virtual ~Database() {}
 
 	///////////////////////////////////////////////////////////////////////////
-	/// Creates a new child table.
-	/// @param name Table name
-	CSQLTable<CON> &table(const basics::string<> &name)
-	{
-		CSQLTable<CON> *tbl = new CSQLTable<CON>(*this,name);
-		tables.insert(name,tbl);
-		return *tbl;
-	}
+	/// Adds a table to the database.
+	Database& operator<<(Table& tbl);
 
-	/// Retrieves a child table.
-	/// @param name Table name
-	CSQLTable<CON> &operator[](const basics::string<> &name) throw(basics::exception)
-	{
-		if( tables.exists(name) )
-			return *tables[name];
-		else
-		{
-			basics::string<> err;
-			err << "CSQLDatabase: Table '" << name << "' not found.";
-			throw basics::exception(err); //## TODO: exception/exit/NULL?
-		}
-	}
+	/// Adds a copy of another existing table to the database.
+	/// Further changes made to the copy will not propagate to the original.
+	Database& operator<<(CopyTable& tbl);
 
 	///////////////////////////////////////////////////////////////////////////
-	/// Verifies that the database in the connection matches this one.
-	/// If differences exist, the connection db is updated.
-	/// @return If the databases matched
-	bool verify();
+	/// Adds a column to the last table.
+	Database& operator<<(Column& col);
 
-	/// Rebuilds the database, removing all previous data.
-	/// @return If it was successfull
-	bool rebuild();
+	/// Adds an int column to the last table.
+	template < typename TT >
+	Database& operator<<(IntColumn< TT >& col);
 
+	/// Adds a text column to the last table.
+	Database& operator<<(TextColumn& col);
+
+	/// Adds a byte column to the last table.
+	Database& operator<<(ByteColumn& col);
+
+	/// Adds an enum column to the last table.
+	Database& operator<<(EnumColumn& col);
+
+	/// Adds a bit column to the last table.
+	Database& operator<<(BitColumn& col);
+
+	/// Adds a reference column to the last table.
+	Database& operator<<(RefColumn& col);
+
+	///////////////////////////////////////////////////////////////////////////
+	/// Adds a database property.
+	Database& operator<<(Property< Database >& prop);
+
+	/// Adds a property to the last table.
+	Database& operator<<(Property< Table >& prop);
+
+	/// Adds a property to the last column of the last table.
+	Database& operator<<(Property< Column >& prop);
+
+	///////////////////////////////////////////////////////////////////////////
+	/// Sets the last column of the last table as part of the primary key
+	/// The column is automatically set to NOT NULL
+	Database& operator<<(Primary& p);
+
+	/// Sets the default value of the colunm of the last table
+	Database& operator<<(Default& default_);
+
+	/// Sets the last colunm of the last table as incrementable
+	Database& operator<<(AutoIncrements& from);
+
+	/// Sets the last column of the last table as unique.
+	Database& operator<<(Unique& prop);
+
+	/// Adds an index to the last table
+	Database& operator<<(Index& idx);
+
+private:
+
+	/// Returns if 
+	bool canAddColumn(const basics::string<>& name) const;
+
+	///////////////////////////////////////////////////////////////////////////
+	/// tables
+	basics::vector< Table > db_tbls;
+
+	/// properties
+	basics::vector< Property< Database > > db_props;
 };
+
+
+///////////////////////////////////////////////////////////////////////////////
+NAMESPACE_END(sq)
+///////////////////////////////////////////////////////////////////////////////
+
+
 #endif // DEVELOPING_CSQL
 
 ///////////////////////////////////////////////////////////////////////////////
