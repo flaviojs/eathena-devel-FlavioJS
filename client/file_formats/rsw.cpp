@@ -8,6 +8,13 @@
 **    May you find forgiveness for yourself and forgive others.
 **    May you share freely, never taking more than you give.
 **
+*************************************************************************
+** Special thanks to:
+**    Borf for quadtree info
+**    ximosoft and who he's thanking for info -> http://rolaboratory.ximosoft.com/file-format/rsw/
+**    Gravity
+**    more will surelly come when I check more info about this format ;D
+**
 ** $Id$
 */
 #include "fx.h"
