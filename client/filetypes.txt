@@ -8,10 +8,10 @@
   bmp | texture\
   tga | texture\
   jpg | texture\
-  emb | ..\_tmpEmblem\
+  ebm | ..\_tmpEmblem\
   str | texture\effect\
   gnd | ?
-  inf | inf\
+  imf | imf\
   rsm | model\
   rsx | model\
   gr2 | model\3dmob\
