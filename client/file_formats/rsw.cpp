@@ -9,15 +9,405 @@
 **    May you share freely, never taking more than you give.
 **
 *************************************************************************
+** This file uses the fox toolkit library.
+**
 ** Special thanks to:
 **    Borf for quadtree info
 **    ximosoft and who he's thanking for info -> http://rolaboratory.ximosoft.com/file-format/rsw/
 **    Gravity
-**    more will surelly come when I check more info about this format ;D
+**    more will surely come when I check more info about this format ;D
 **
 ** $Id$
 */
-#include "fx.h"
+#include "rsw.h"
+
+using namespace NRSW;
+// 1.2 - base supported version
+// 1.3 - water height added, object type 1 has more data
+// 1.4 - gat filename added
+// 1.5 - 2 ints and 2 Vector3D's (unk1/unk2/vec1/vec2) added
+// 1.6 - 4 unknown ints(?) (unk4/unk5/unk6/unk7) added
+// 1.7 - unknown float (unk3) added
+// 1.8 - water type, water amplitude, water phase, surface curve Level added
+// 1.9 - texture cycling added
+// 2.0 - float added to object type 3 (sound object)
+// 2.1 - quadtree of scene areas added (6 levels deep)
+
+//-----------------------------------------------------------------------------
+// RSW
+
+/// If this RSW is compatible with the target version (version >= target)
+bool RSW::IsCompatibleWith(FXchar major_ver, FXchar minor_ver) const
+{
+	return ( ( this->major_ver == major_ver && this->minor_ver >= minor_ver ) || this->major_ver > major_ver );
+}
+
+/// Load RSW from a stream
+FXStream& operator>>(FXStream& store, RSW& rsw)
+{
+	rsw.load(store);
+	return store;
+}
+void RSW::load(FX::FXStream &store)
+{
+	bool bigEndian = store.isBigEndian();
+	store.setBigEndian(false);// data is in little endian
+	store.load(magic, 4);
+	store >> major_ver;
+	store >> minor_ver;
+	store.load(ini_file, 40);
+	store.load(gnd_file, 40);
+	if( IsCompatibleWith(1,4) )
+		store.load(gat_file, 40);
+	else
+		memset(gat_file, 0, 40);
+	if( IsCompatibleWith(1,3) )
+		store >> water_height;
+	else
+		water_height = 0.0f;
+	if( IsCompatibleWith(1,8) )
+	{
+		store >> water_type;
+		store >> water_amplitude;
+		store >> water_phase;
+		store >> surface_curve_level;
+	}
+	else
+	{
+		water_type = 0;
+		water_amplitude = 1.0;
+		water_phase = 2.0;
+		surface_curve_level = 0.5;
+	}
+	if( IsCompatibleWith(1,9) )
+		store >> texture_cycling;
+	else
+		texture_cycling = 3;
+	if( IsCompatibleWith(1,4) )
+	{
+		store >> unk1;
+		store >> unk2;
+		store >> vec1;
+		store >> vec2;
+	}
+	else
+	{
+		unk1 = 45;
+		unk2 = 45;
+		FXfloat v1[3] = { 1.0f , 1.0f , 1.0f };
+		vec1 = v1;
+		FXfloat v2[3] = { 0.3f , 0.3f , 0.3f };
+		vec2 = v2;
+	}
+	if( IsCompatibleWith(1,7) )
+		store >> unk3;// ignored
+	if( IsCompatibleWith(1,6) )
+	{
+		store >> unk4;
+		store >> unk5;
+		store >> unk6;
+		store >> unk7;
+	}
+	else
+	{
+		unk4 = -500;
+		unk5 = 500;
+		unk6 = -500;
+		unk7 = 500;
+	}
+	store >> object_count;
+	// objects
+	fxcalloc((void**)&objects, object_count*sizeof(RSWObject*));
+	models.clear();
+	lights.clear();
+	sounds.clear();
+	effects.clear();
+	for( FXint i = 0; i < object_count; ++i )
+	{
+		FXint type;
+		store >> type;
+		switch( type )
+		{
+		case ModelObjectType:
+			{
+				ModelObject* model = new ModelObject(store.position());
+				if( IsCompatibleWith(1,3) )
+					model->load(store, ModelObject::Version0103);
+				else
+					model->load(store, ModelObject::VersionBase);
+				models.push_back(model);
+				objects[i] = model;
+				break;
+			}
+		case LightObjectType:
+			{
+				LightObject* light = new LightObject(store.position());
+				light->load(store);
+				lights.push_back(light);
+				objects[i] = light;
+				break;
+			}
+		case SoundObjectType:
+			{
+				SoundObject* sound = new SoundObject(store.position());
+				if( IsCompatibleWith(2,0) )
+					sound->load(store, SoundObject::Version0200);
+				else
+					sound->load(store, SoundObject::VersionBase);
+				sounds.push_back(sound);
+				objects[i] = sound;
+				break;
+			}
+		case EffectObjectType:
+			{
+				EffectObject* effect = new EffectObject(store.position());
+				effect->load(store);
+				effects.push_back(effect);
+				objects[i] = effect;
+				break;
+			}
+		default:
+			{
+				fxerror("unknown type %d for RSW object %d/%d at offset %lld\n", type, (i+1), object_count, store.position());
+				objects[i] = new RSWObject(store.position());
+			}
+		}
+	}
+	// TODO quadtree
+	store.setBigEndian(bigEndian);// revert to the previous endianess
+}
+
+/// Save RSW to a stream
+FXStream& operator<<(FXStream& store, const RSW& rsw)
+{
+	rsw.save(store);
+	return store;
+}
+void RSW::save(FX::FXStream &store) const
+{
+	bool bigEndian = store.isBigEndian();
+	store.save(magic, 4);
+	store << major_ver;
+	store << minor_ver;
+	store.save(ini_file, 40);
+	store.save(gnd_file, 40);
+	if( IsCompatibleWith(1,4) )
+		store.save(gat_file, 40);
+	if( IsCompatibleWith(1,3) )
+		store << water_height;
+	if( IsCompatibleWith(1,8) )
+	{
+		store << water_type;
+		store << water_amplitude;
+		store << water_phase;
+		store << surface_curve_level;
+	}
+	if( IsCompatibleWith(1,9) )
+		store << texture_cycling;
+	if( IsCompatibleWith(1,4) )
+	{
+		store << unk1;
+		store << unk2;
+		store << vec1;
+		store << vec2;
+	}
+	if( IsCompatibleWith(1,7) )
+		store << unk3;// ignored
+	if( IsCompatibleWith(1,6) )
+	{
+		store << unk4;
+		store << unk5;
+		store << unk6;
+		store << unk7;
+	}
+	store << object_count;
+	// TODO objects
+	// TODO quadtree
+	store.setBigEndian(bigEndian);
+}
+
+//-----------------------------------------------------------------------------
+// Model object
+
+void ModelObject::load(FXStream& store, ModelObject::Version v)
+{
+	if( v == Version0103 )
+	{
+		store.load(name, 40);
+		store >> unk1;
+		store >> unk2;
+		store >> unk3;
+	}
+	else
+	{
+		name[0] = 0;
+		unk1 = 0;
+		unk2 = 1.0f;
+		unk3 = 0;
+	}
+	store.load(filename, 40);
+	store.load(reserved, 40);
+	store.load(type, 20);
+	store.load(sound, 20);
+	store.load(todo1, 40);
+	store >> pos_x;
+	store >> pos_y;
+	store >> pos_z;
+	store >> rot_x;
+	store >> rot_y;
+	store >> rot_z;
+	store >> scale_x;
+	store >> scale_y;
+	store >> scale_z;
+}
+
+void ModelObject::save(FXStream& store, ModelObject::Version v) const
+{
+	if( v == Version0103 )
+	{
+		store.save(name, 40);
+		store << unk1;
+		store << unk2;
+		store << unk3;
+	}
+	store.save(filename, 40);
+	store.save(reserved, 40);
+	store.save(type, 20);
+	store.save(sound, 20);
+	store.save(todo1, 40);
+	store << pos_x;
+	store << pos_y;
+	store << pos_z;
+	store << rot_x;
+	store << rot_y;
+	store << rot_z;
+	store << scale_x;
+	store << scale_y;
+	store << scale_z;
+}
+
+//-----------------------------------------------------------------------------
+// Light object
+
+void LightObject::load(FXStream& store)
+{
+	store.load(name, 40);
+	store >> pos_x;
+	store >> pos_y;
+	store >> pos_z;
+	store.load(todo1, 40);
+	store >> color_r;
+	store >> color_g;
+	store >> color_b;
+	store >> todo2;
+}
+
+void LightObject::save(FXStream& store) const
+{
+	store.save(name, 40);
+	store << pos_x;
+	store << pos_y;
+	store << pos_z;
+	store.save(todo1, 40);
+	store << color_r;
+	store << color_g;
+	store << color_b;
+	store << todo2;
+}
+
+//-----------------------------------------------------------------------------
+// Sound object
+
+void SoundObject::load(FXStream& store, Version v)
+{
+	store.load(name, 80);
+	store.load(filename, 80);
+	store >> todo1;
+	store >> todo2;
+	store >> todo3;
+	store >> todo4;
+	store >> todo5;
+	store >> todo6;
+	store >> todo7;
+	if( v == Version0200 )
+		store >> todo8;
+	else
+		todo8 = 4.0f;
+}
+
+void SoundObject::save(FXStream& store, Version v) const
+{
+	store.save(name, 80);
+	store.save(filename, 80);
+	store << todo1;
+	store << todo2;
+	store << todo3;
+	store << todo4;
+	store << todo5;
+	store << todo6;
+	store << todo7;
+	if( v == Version0200 )
+		store << todo8;
+}
+
+//-----------------------------------------------------------------------------
+// Effect object
+
+void EffectObject::load(FXStream& store)
+{
+	position = store.position();
+
+	store.load(name, 40);
+	store >> todo1;
+	store >> todo2;
+	store >> todo3;
+	store >> todo4;
+	store >> todo5;
+	store >> todo6;
+	store >> todo7;
+	store >> todo8;
+	store >> todo9;
+	store >> category;
+	store >> pos_x;
+	store >> pos_y;
+	store >> pos_z;
+	store >> type;
+	store >> loop;
+	store >> todo10;
+	store >> todo11;
+	store >> todo12;
+	store >> todo13;
+}
+
+void EffectObject::save(FXStream& store) const
+{
+	store.save(name, 40);
+	store << todo1;
+	store << todo2;
+	store << todo3;
+	store << todo4;
+	store << todo5;
+	store << todo6;
+	store << todo7;
+	store << todo8;
+	store << todo9;
+	store << category;
+	store << pos_x;
+	store << pos_y;
+	store << pos_z;
+	store << type;
+	store << loop;
+	store << todo10;
+	store << todo11;
+	store << todo12;
+	store << todo13;
+}
+
+//-----------------------------------------------------------------------------
+// old
+
+//#define OLD_DEBUG_RSW
+#ifdef OLD_DEBUG_RSW
 #include <stdio.h>
 
 struct Vector3D
@@ -27,39 +417,6 @@ struct Vector3D
 	FXfloat z;// maybe
 
 	void set(FXfloat x, FXfloat y, FXfloat z)	{ this->x = x; this->y = y; this->z = z; }
-};
-
-struct RSW
-{
-	FXchar magic[4];// "GRSW"
-	FXchar major_ver;// version <= 2.1
-	FXchar minor_ver;
-	FXchar ini_file[40];// ini file (in alpha only?) - ignored
-	FXchar gnd_file[40];// ground file
-	FXchar gat_file[40];// altitude file (version >= 1.4)
-	FXchar src_file[40];// source file (in alpha only?) // scr_file???
-	FXfloat water_height;// water height (version >= 1.3)
-	FXint water_type;// water type (version >= 1.8)
-	FXfloat water_amplitude;// water amplitude (version >= 1.8)
-	FXfloat water_phase;// water phase (version >= 1.8)
-	FXfloat surface_curve_level;// water surface curve level (version >= 1.8)
-	FXint texture_cycling;// texture cycling (version >= 1.9)
-	FXint unk1;// (version >= 1.5)
-	FXint unk2;// (version >= 1.5)
-	Vector3D vec1;// (version >= 1.5)
-	Vector3D vec2;// (version >= 1.5)
-	FXfloat unk3;// (version >= 1.7)
-	FXint unk4;// (version >= 1.6)
-	FXint unk5;// (version >= 1.6)
-	FXint unk6;// (version >= 1.6)
-	FXint unk7;// (version >= 1.6)
-	FXint object_count;
-
-	// TODO add linked list(s) of objects
-
-	// TODO add quadtree of "scene graph nodes"
-
-	bool IsCompatibleWith(FXchar major, FXchar minor)	{ return ( ( major_ver == major && minor_ver >= minor ) || major_ver > major ); }
 };
 
 // 1.2 - base supported version
@@ -74,6 +431,7 @@ struct RSW
 // 2.1 - quadtree of scene areas added (6 levels deep)
 int main(int argc, char argv[])
 {
+	FXStream s;
 	FXString* filelist;
 	FXint files = FXDir::listFiles(filelist, ".", "*.rsw", FXDir::NoDirs);
 	for( FXint filenum = 0; filenum < files; ++filenum )
@@ -116,10 +474,10 @@ int main(int argc, char argv[])
 			else
 				d.gat_file[0] = 0;
 
-			// src file - source file
+			// scr file - ???
 			pos = f.position();
-			f.readBlock(d.src_file, 40);
-			printf("%lld:src_file=%.40s\n", pos, d.src_file);
+			f.readBlock(d.scr_file, 40);
+			printf("%lld:scr_file=%.40s\n", pos, d.scr_file);
 			
 			// water height
 			if( d.IsCompatibleWith(1,3) )
@@ -412,3 +770,5 @@ void ParseSceneGraphNode(FXFile& f, FXint level, FXint index)
 		}
 	}
 }
+
+#endif// OLD_DEBUG_RSW
