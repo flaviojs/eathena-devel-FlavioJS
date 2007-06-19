@@ -1,0 +1,85 @@
+    **=====================**
+   //                       \\
+  //    Vanaheim Project     \\
+ //                           \\
+||  vanaheimproject@gmail.com  ||
+ \\                           //
+  **=========================**
+      GRF alpha File Format
+     by flaviojs @ April 2007
+  **=========================**
+
+
+
+This version is used by the alpha and beta1 clients.
+A Grf file contains files and folders. File contents can be compressed or not.
+All the data is in Little endian format.
+
+
+
+  ==((   Grf descriptor    ))==
+
+At the end of the file there are 9 bytes that describe where the entry list is 
+located, the number of entries and the version of the format being used:
+
+<entry_list_off>.4B <num_entries>.4B <version_maybe>.B [EOF]
+
+'entry_list_off' is where the entry list starts, relative to the start of the file
+
+'num_entries' has the upper and lower words (2 bytes) switched
+num_entries = ( num_entries << 16 ) | ( num_entries >> 16 );
+
+'version' is the version of the grf? always 0x12
+TODO check which grf versions exist
+
+
+
+  ==((     Entry list      ))==
+
+List of 'num_entries' entries (folders and files) in the grf.
+The list starts at offset 'entry_list_off'.
+Each entry has variable size and uses the format:
+
+<name_len>.B <type>.B <offset>.4B <packed_size>.4B <real_size>.4B <name>.?B
+
+'name_len' is the length of the name, excluding the null terminator
+
+'type' determines if it's a directory or a fie and if it's compressed or not:
+type=0 : file (raw, uncompressed)
+type=1 : file (compressed)
+type=2 : directory
+
+'offset' is where the data starts in the grf, 0 for directories
+
+'packed_size' is the size of the data in the grf, 0 for directories
+
+'real_size' is the size of the data after uncompression, 0 for directories
+
+'name' is the pathname of the entry with the half bytes switched
+name[i] = ( name[i] << 4 ) | ( name[i] >> 4 );
+The length of this field is 'name_len' + 1 for the null terminator (a 00 byte 
+at the end).
+All directories in this pathname are separated by '/' and need to have it's 
+entries before.
+Example:
+  the directory entry "data" needs to be before the directory entry "data/texture",
+  which needs to be before the file entry "data/texture/some_file.bmp"
+
+
+
+  ==((     Compression     ))==
+
+The compression method is a derivative of LZSS. [1]
+It has a dictionary window of 4096 bytes (12 bits) and a maximum match length 
+of 15 (4 bits) + 2 (minimum encoding length).
+The main difference is that the coded/unencoded flags are agregated in groups 
+of 8 (1 byte).
+
+TODO extended description
+
+
+
+  ==((     Bibliography    ))==
+
+[1] http://en.wikipedia.org/wiki/LZSS
+    http://michael.dipperstein.com/lzss/
