@@ -27,24 +27,30 @@ th {
     
     
     <h2>Description</h2>
-    <p>Sprite file format, this file contains a collection of frames.<br/>
-    Each frame is a palette image or RGB image.<br/>
-    Frames are referenced in <tt>Act</tt> files.<br/>
-    Palette index 0 is considered 'invisible' background.<br/>
-    Only the background color is RLE encoded and can span multiple rows.
+    <p>
+      Sprite file format, this file contains a collection of images.<br/>
+      There are two types of images, palette images and RGBA images.
     </p>
-    <p>All the data is in little-endian.<br/>This means that the number <tt>0x0A0B0C0D</tt> is stored as:</p>
-    <table>
-      <caption><i>increasing addresses</i>&nbsp;&nbsp;&rarr;</caption>
-      <tr>
-        <td><tt>...</tt></td>
-        <td><tt>0x0D</tt></td>
-        <td><tt>0x0C</tt></td>
-        <td><tt>0x0B</tt></td>
-        <td><tt>0x0A</tt></td>
-        <td><tt>...</tt></td>
-      </tr>
-    </table>
+    <p>
+      All the data is in little-endian.<br/>
+      This means that the number <tt>0x0A0B0C0D</tt> is stored as:
+      <table>
+        <caption><i>increasing addresses</i>&nbsp;&nbsp;&rarr;</caption>
+        <tr>
+          <td><tt>...</tt></td>
+          <td><tt>0x0D</tt></td>
+          <td><tt>0x0C</tt></td>
+          <td><tt>0x0B</tt></td>
+          <td><tt>0x0A</tt></td>
+          <td><tt>...</tt></td>
+        </tr>
+      </table>
+    </p>
+    <p>
+      Notes:<br>
+      - <span style="color: #ff00ff;">magenta</span> RGB(255,0,255) is usually displayed as an 'invisible' color<br>
+      - images with square dimentions are recommended
+    </p>
     
     
     
@@ -52,15 +58,15 @@ th {
     <ul>
       <li>1.0 - Base</li>
       <li>1.1 - Added palette at end of file</li>
-      <li>2.0 - Added RGB frames</li>
-      <li>2.1 - Added RLE-encoding of the background color in palette frames</li>
+      <li>2.0 - Added RGBA images</li>
+      <li>2.1 - Added RLE-encoding of the background in palette images</li>
     </ul>
     <table>
       <tr>
         <th>Version</th>
-        <th>Palette frames</th>
+        <th>Palette images</th>
         <th>Palette</th>
-        <th>RGB frames</th>
+        <th>RGBA images</th>
       </tr>
       <tr>
         <td>1.0</td>
@@ -82,7 +88,7 @@ th {
       </tr>
       <tr>
         <td>2.1</td>
-        <td>RLE encoded background</td>
+        <td>yes, RLE encoded background</td>
         <td>yes</td>
         <td>yes</td>
       </tr>
@@ -101,7 +107,7 @@ th {
       <tr>
         <td>magic</td>
         <td>2</td>
-        <td>'SP'</td>
+        <td>'SP' (<tt>0x53 0x50</tt>)</td>
       </tr>
       <tr>
         <td>version</td>
@@ -109,14 +115,14 @@ th {
         <td>0x100</td>
       </tr>
       <tr>
-        <td>nPalFrames</td>
+        <td>nPalImages</td>
         <td>2</td>
-        <td>number of palette frames</td>
+        <td>number of palette images</td>
       </tr>
       <tr>
-        <td>palFrames</td>
-        <td><i>variable</i> * nPalFrames</td>
-        <td>data of the palette frames</td>
+        <td>palImages</td>
+        <td><i>variable</i> * nPalImages</td>
+        <td>data of the palette images</td>
       </tr>
     </table>
     <br/>
@@ -130,7 +136,7 @@ th {
       <tr>
         <td>magic</td>
         <td>2</td>
-        <td>'SP'</td>
+        <td>'SP' (<tt>0x53 0x50</tt>)</td>
       </tr>
       <tr>
         <td>version</td>
@@ -138,14 +144,14 @@ th {
         <td>0x101</td>
       </tr>
       <tr>
-        <td>nPalFrames</td>
+        <td>nPalImages</td>
         <td>2</td>
-        <td>number of palette frames</td>
+        <td>number of palette images</td>
       </tr>
       <tr>
-        <td>palFrames</td>
-        <td><i>variable</i> * nPalFrames</td>
-        <td>data of the palette frames</td>
+        <td>palImages</td>
+        <td><i>variable</i> * nPalImages</td>
+        <td>data of the palette images</td>
       </tr>
       <tr>
         <td>palette</td>
@@ -164,7 +170,7 @@ th {
       <tr>
         <td>magic</td>
         <td>2</td>
-        <td>'SP'</td>
+        <td>'SP' (<tt>0x53 0x50</tt>)</td>
       </tr>
       <tr>
         <td>version</td>
@@ -172,24 +178,24 @@ th {
         <td>0x200</td>
       </tr>
       <tr>
-        <td>nPalFrames</td>
+        <td>nPalImages</td>
         <td>2</td>
-        <td>number of palette frames</td>
+        <td>number of palette images</td>
       </tr>
       <tr>
-        <td>nRgbFrames</td>
+        <td>nRgbaImages</td>
         <td>2</td>
-        <td>number of RGB frames</td>
+        <td>number of RGBA images</td>
       </tr>
       <tr>
-        <td>palFrames</td>
-        <td><i>variable</i> * nPalFrames</td>
-        <td>data of the palette frames</td>
+        <td>palImages</td>
+        <td><i>variable</i> * nPalImages</td>
+        <td>data of the palette images</td>
       </tr>
       <tr>
-        <td>rgbFrames</td>
-        <td><i>variable</i> * nRgbFrames</td>
-        <td>data of the RGB frames</td>
+        <td>rgbaImages</td>
+        <td><i>variable</i> * nRgbaImages</td>
+        <td>data of the RGBA images</td>
       </tr>
       <tr>
         <td>palette</td>
@@ -208,7 +214,7 @@ th {
       <tr>
         <td>magic</td>
         <td>2</td>
-        <td>'SP'</td>
+        <td>'SP' (<tt>0x53 0x50</tt>)</td>
       </tr>
       <tr>
         <td>version</td>
@@ -216,24 +222,24 @@ th {
         <td>0x201</td>
       </tr>
       <tr>
-        <td>nPalFrames</td>
+        <td>nPalImages</td>
         <td>2</td>
-        <td>number of palette frames</td>
+        <td>number of palette images</td>
       </tr>
       <tr>
-        <td>nRgbFrames</td>
+        <td>nRgbaImages</td>
         <td>2</td>
-        <td>number of RGB frames</td>
+        <td>number of RGBA images</td>
       </tr>
       <tr>
-        <td>palFrames</td>
-        <td><i>variable</i> * nPalFrames</td>
-        <td>data of the palette frames (RLE-encoded background)</td>
+        <td>palImages</td>
+        <td><i>variable</i> * nPalImages</td>
+        <td>data of the palette images (RLE-encoded background)</td>
       </tr>
       <tr>
-        <td>rgbFrames</td>
-        <td><i>variable</i> * nRgbFrames</td>
-        <td>data of the RGB frames</td>
+        <td>rgbaImages</td>
+        <td><i>variable</i> * nRgbaImages</td>
+        <td>data of the RGBA images</td>
       </tr>
       <tr>
         <td>palette</td>
@@ -244,7 +250,7 @@ th {
     
     
     
-    <h3>Palette frame</h3>
+    <h3>Palette image</h3>
     <table>
       <tr>
         <th>Field</th>
@@ -267,11 +273,22 @@ th {
         <td>image data, 1 byte per pixel</td>
       </tr>
     </table>
-    <p>Each byte represents an index in the palette.</p>
+    <p>
+      Each byte represents an index in the palette.<br/>
+      Palette index 0 is the 'invisible' background.
+    </p>
+    <p>
+      Pixels go left to right &rarr;, top to bottom &darr;<br/>
+      <table>
+        <tr> <td><tt>0</tt></td> <td><tt>1</tt></td> <td><tt>2</tt></td> </tr>
+        <tr> <td><tt>3</tt></td> <td><tt>4</tt></td> <td><tt>5</tt></td> </tr>
+        <tr> <td><tt>6</tt></td> <td><tt>7</tt></td> <td><tt>8</tt></td> </tr>
+      </table>
+    </p>
     
     
     
-    <h3>Palette frame (RLE-encoded background)</h3>
+    <h3>Palette image (RLE-encoded background)</h3>
     <table>
       <tr>
         <th>Field</th>
@@ -300,13 +317,23 @@ th {
       </tr>
     </table>
     <p>
-      Only the background (palette index 0) is RLE encoded.<br/>
+      Each byte represents an index in the palette.<br/>
+      Palette index 0 is the 'invisible' background.<br/>
+      Only the background is RLE encoded.<br/>
       When a <tt>0x00</tt> byte is parsed, the next byte indicates the number of <tt>0x00</tt> bytes it decompresses to. (<tt>0x00 0x00</tt> decompresses to a single <tt>0x00</tt> byte)
+    </p>
+    <p>
+      Pixels go left to right &rarr;, top to bottom &darr;<br/>
+      <table>
+        <tr> <td><tt>0</tt></td> <td><tt>1</tt></td> <td><tt>2</tt></td> </tr>
+        <tr> <td><tt>3</tt></td> <td><tt>4</tt></td> <td><tt>5</tt></td> </tr>
+        <tr> <td><tt>6</tt></td> <td><tt>7</tt></td> <td><tt>8</tt></td> </tr>
+      </table>
     </p>
     
     
     
-    <h3>RGB frame</h3>
+    <h3>RGBA image</h3>
     <table>
       <tr>
         <th>Field</th>
@@ -330,8 +357,41 @@ th {
       </tr>
     </table>
     <p>
-    <i>TODO</i> (find/produce a working sample file to confirm and test)
+      Pixels go left to right &rarr;, bottom to top&uarr;<br/>
+      <table>
+        <tr> <td><tt>6</tt></td> <td><tt>7</tt></td> <td><tt>8</tt></td> </tr>
+        <tr> <td><tt>3</tt></td> <td><tt>4</tt></td> <td><tt>5</tt></td> </tr>
+        <tr> <td><tt>0</tt></td> <td><tt>1</tt></td> <td><tt>2</tt></td> </tr>
+      </table>
     </p>
+    <table>
+      <caption>RGBA pixel</caption>
+      <tr>
+        <th>Field</th>
+        <th>Size</th>
+        <th>Comment</th>
+      </tr>
+      <tr>
+        <td>alpha</td>
+        <td>1</td>
+        <td>alpha channel/opacity</td>
+      </tr>
+      <tr>
+        <td>blue</td>
+        <td>1</td>
+        <td>blue intensity</td>
+      </tr>
+      <tr>
+        <td>green</td>
+        <td>1</td>
+        <td>green intensity</td>
+      </tr>
+      <tr>
+        <td>red</td>
+        <td>1</td>
+        <td>red intensity</td>
+      </tr>
+    </table>
     
     
     
@@ -373,9 +433,9 @@ th {
         <td>intensity of blue in the color</td>
       </tr>
       <tr>
-        <td>unknown</td>
+        <td>reserved</td>
         <td>1</td>
-        <td>always 0</td>
+        <td>always 0, ignored</td>
       </tr>
     </table>
   </body>
