@@ -1,0 +1,193 @@
+==========================================================================
+ Authentication
+--------------------------------------------------------------------------
+
+This file describes how the authentication process works and 
+how the servers use internal locks to avoid duplicate sessions.
+
+Contents:
+* Locks
+* User Locking
+* User Authentication
+* Server Authentication
+* Timeout Timers
+
+
+==========================================================================
+ Locks
+--------------------------------------------------------------------------
+
+Account Lock:
+	This lock represents a user account.
+	It can be owned by the login-server or a char-server.
+	It is identified by account_id, login_id1, login_id2 and sex.
+	Only who owns the lock can request changes to the account data.
+
+Character Lock:
+	This lock represents the character of an account.
+	It can be owned by the char-server or a map-server.
+	It is identified by account_id, char_id, login_id1, login_id2 and sex.
+	Only who owns the lock can request changes to the character data.
+	Owning this lock implies owning the account lock.
+
+Char-server Lock:
+	This lock represents a char-server. (in the login-server)
+	It is identified by cookie.
+	It allows the char-server to reconnect, reclaim the locks owned before the disconnect and continue as if nothing happened.
+	Note: each char-server that is connected to the login-server must use a different username+password
+
+Map-server Lock:
+	This lock represents a map-server. (in the char-server)
+	It is identified by cookie.
+	It allows the map-server to reconnect, reclaim the locks owned before the disconnect and continue as if nothing happened.
+	Note: each map-server that is connected to the char-server must use the same username+password as the char-server
+
+
+==========================================================================
+ User Locking
+--------------------------------------------------------------------------
+
+     (passive)           (active)          (passive)
+    login-server ------ char-server ------ map-server
+
+Login-server:
+	Receives account lock requests from the char-server(s).
+
+Char-server:
+	Sends account lock requests to the login-server.
+	Sends character locks to the map-server(s).
+
+Map-server:
+	Receives character locks from the char-server.
+
+
+==========================================================================
+ User Authentication
+--------------------------------------------------------------------------
+
+Login-server:
+	1) Client connects to login-server.
+	2.a) [if raw password] Client sends username and password to login-server.
+	2.b) [if hash password]:
+	2.b.1) Client requests hash key (password salt) from login-server.
+	2.b.2) Login-server replies with new hash key to client.
+	2.b.3) Client sends username and hashed password to login-server.
+	3.a) [if auth failed] Login-server rejects client.
+	3.b) [if auth ok]:
+	3.b.a) [if account lock owned by a char-server] Login-server rejects client and requests kick from char-server.
+	3.b.b) [else]:
+	3.b.b.1) Login-server (re)creates account lock with new login_id1/login_id2. (account lock owned by the login-server)
+	3.b.b.2) Login-server sends account_id, login_id1, login_id2, sex and list of servers to client.
+	4) Client disconnects. (server selection is done offline)
+
+Char-server:
+	1) Client connects to char-server.
+	2) Client sends account_id, login_id1, login_id2 and sex to char-server.
+	3) Char-server sends account_id, login_id1, login_id2 and sex to login-server. (request account lock)
+	4.a) [if account lock matches and not owned by other char-server] Login-server replies auth ok to char-server. (account lock owned by the char-server)
+	4.b) [else] Login-server replies auth failed to char-server.
+	5.a) [if auth failed] Char-server rejects client.
+	5.b) [if auth ok]:
+	5.b.a) [if character lock owned by a map-server] Char-server rejects client and requests kick from map-server.
+	5.b.b) [if character lock exists] Char-server rejects client.
+	5.b.c) [else]:
+	5.b.c.1) Char-server creates character lock with invalid char_id. (character lock owned by the char-server)
+	5.b.c.2) Char-server sends list of characters to client.
+	5.b.c.3) ...
+	5.b.c.4) Client sends selected character to char-server.
+	5.b.c.5) Char-server updates character lock. (if another character selection is received, the client is kicked and the locks are released)
+	5.b.c.6) Char-server sends character lock to target map-server and receives an ack. (character lock owned by the map-server)
+	5.b.c.8) Char-server sends char_id, mapname and map-server address to client.
+	6) Client disconnects.
+
+Map-server:
+	1) Client connects to map-server.
+	2) Client sends account_id, char_id, login_id1 and sex to map-server.
+	3.a) [if not found or doesn't match] Map-server rejects client and client disconnects. (END)
+	3.b) [else] ...(normal play)
+
+
+==========================================================================
+ Server Authentication
+--------------------------------------------------------------------------
+
+Char-server connecting:
+	1) Char-server connects to login-server.
+	2) Char-server sends username and password to login-server.
+	3.a) [if auth failed or char-server lock exists] Login-server rejects char-server and char-server disconnects. (END)
+	3.b) [else]:
+	3.b.1) Login-server creates char-server lock with a unique random cookie.
+	3.b.2) Login-server replies login ok and cookie to char-server.
+	3.b.3) ...(normal server operation)
+
+Char-server reconnecting:
+	1) Char-server connects to login-server.
+	2) Char-server sends cookie to login-server.
+	3.a) [if cookie exists and is not connected]:
+	3.a.1) Login-server starts timeout timers on all the account locks that were owned before the disconnect.
+	3.a.2) Login-server replies login ok to char-server.
+	3.a.3) Char-server reclaims known account locks from the login-server.
+	3.a.4) ...(normal server operation)
+	3.b) [else]:
+	3.b.1) Login-server rejects char-server.
+	3.b.2) Char-server kicks all players, discarding changes.
+	3.b.3) Char-server disconnects.
+	3.b.4) ...(continue in the previous case 'Char-server connecting')
+
+Map-server connecting:
+	1) Map-server connects to char-server.
+	2) Map-server sends username and password to char-server.
+	3.a) [if auth does not match] Char-server rejects map-server and map-server disconnects. (END)
+	3.b) [else]:
+	3.b.1) Char-server creates map-server lock with a unique random cookie.
+	3.b.2) Char-server replies login ok and cookie to map-server.
+	3.b.3) ...(normal server operation)
+
+Map-server reconnecting:
+	1) Map-server connects to char-server.
+	2) Map-server sends cookie to char-server.
+	3.a) [if cookie exists and is not connected]:
+	3.a.1) Char-server starts timeout timers on all the character locks that were owned before the disconnect.
+	3.a.2) Char-server replies login ok to map-server.
+	3.a.3) Map-server reclaims known character locks from the char-server.
+	3.a.4) ...(normal server operation)
+	3.b) [else]:
+	3.b.1) Char-server rejects map-server.
+	3.b.2) Map-server kicks all players, discarding changes.
+	3.b.3) Map-server disconnects.
+	3.b.4) ...(continue in the previous case 'Map-server connecting')
+
+
+==========================================================================
+ Timeout Timers
+--------------------------------------------------------------------------
+
+User moving from login-server to char-server:
+	Timeout timer on the account lock in the login-server.
+	If time runs out the account lock is released. (char-server can't authenticate client)
+	It is canceled when the account lock is authenticated.
+
+User moving from char-server to map-server:
+	Timeout timer on the character lock in the map-server.
+	If time runs out the character lock is released. (client can't enter map-server)
+	It is canceled when the character lock is authenticated.
+
+Char-server reconnecting to the login-server:
+	Timeout timer on the char-server lock in the login-server.
+	If time runs out the char-server lock is released. (char-server can't reconnect)
+	It is canceled when the char-server reconnects. (and starts the timers of the next case)
+
+Char-server reclaiming account locks:
+	Timeout timer on (each) account lock in the login-server, that was owned by the disconnected char-server.
+	If time runs out the account lock is released. (char-server can't reclaim lock)
+	It is canceled when the account lock is reclaimed.
+
+Map-server reconnecting to the char-server:
+	Timeout timer on the map-server lock in the char-server.
+	If time runs out the map-server lock is released. (map-server can't reconnect)
+	It is canceled when the map-server reconnects. (and starts the timers of the next case)
+
+Map-server reclaiming character locks:
+	Timeout timer on (each) character lock in the char-server, that was owned by the disconnected map-server.
+	If time runs out the character lock is released. (map-server can't reclaim lock)
+	It is canceled when the character lock is reclaimed.
