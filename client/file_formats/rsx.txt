@@ -1,0 +1,69 @@
+[ Header ]
+Field				Size		Comment
+-----				----		-------
+magic				4			???
+verMajor			1			??? // uchar
+verMinor			1			??? // uchar
+{ == v1.x && >= v1.2
+	Field		Size		Comment
+	-----		----		-------
+	zoom		4			??? // float
+	pivot		12			??? // vector3d
+}
+{ == v1.x && >= v1.3
+	Field		Size		Comment
+	-----		----		-------
+	alpha		4			??? // int
+}
+shade				4			??? // int
+numFrame			4			??? // int
+tickPerFrame		4			??? // int
+reserved			16			??? // char[16]
+numTexture			4			??? // int
+{ * numTexture
+	Field			Size		Comment
+	-----			----		-------
+	textureName		40			??? // char[40]
+}
+mainNode			40			??? // char[40]
+numNodes			4			??? // int
+{ * numNodes
+	Field				Size		Comment
+	-----				----		-------
+	nodeHeader			4			??? // int // 0x12345678
+	name				40			??? // char[40]
+	parentName			40			??? // char[40]
+	numTextures			4			??? // int
+	{ * numTextures
+		Field				Size		Comment
+		-----				----		-------
+		textureIndex		4			??? // int
+	}
+	numVertices			4			??? // int
+	{ * numFrame
+		{ * numVertices
+			Field		Size		Comment
+			-----		----		-------
+			vertice		12			??? // vector3d
+		}
+	}
+	numTVertices		4		??? // int
+	tvertIdentity		4		??? // int
+	{ * (tvertIdentity ? 1 : numFrame)
+		{ * numTVertices
+			Field			Size		Comment
+			-----			----		-------
+			tvertice		12			??? // tvertex3d
+		}
+	}
+	numFaces			4		??? // int
+	{ * numFaces
+		Field		Size		Comment
+		-----		----		-------
+		face		22			??? // face3d
+	}
+}
+
+// struct vector3d {float x; float y; float z;};
+// struct tvertex3d {ulong color; float u; float v;};
+// struct face3d {ushort vertindex[3]; ushort tvertindex[3]; ushort meshMtlId; /*ushort __padding0xE; */ int twoSide; int smoothGroup;};

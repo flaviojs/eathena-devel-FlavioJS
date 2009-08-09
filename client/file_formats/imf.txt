@@ -1,0 +1,33 @@
+// (from ximosoft rolaboratory)
+// IMF : Interact Manage File
+// Contains how the objects interacts.
+//
+// Work on progress.
+--------------------------------------------------------------------------------
+
+Field			Size		Comment
+-----			----		-------
+version			4 bytes		float (must be >= 1.01)
+checksum		4 bytes		??? int
+maxLayer		4 bytes		??? int
+{ * (maxLayer + 1)
+	Field			Size		Comment
+	-----			----		-------
+	numAction		4 bytes		??? int
+	{ * numAction
+		Field			Size		Comment
+		-----			----		-------
+		numMotion		4 bytes		??? int
+		{ * numMotion
+			Field			Size		Comment
+			-----			----		-------
+			priority		4 bytes		??? int
+			cx				4 bytes		??? int
+			cy				4 bytes		??? int
+		}
+	}
+}
+
+// [layer][action][motion]{priority,cx,cy}
+// supports priorities [0,15[
+// supports actions [0,104[

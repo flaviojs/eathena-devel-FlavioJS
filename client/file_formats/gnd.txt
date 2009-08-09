@@ -1,0 +1,139 @@
+
+http://www.vsoftonline.com/blog/?page_id=58
+
+[ Header ]
+Field			Size		Comment
+-----			----		-------
+magic			4			"GRGN" (0x47 0x52 0x47 0x4E)
+varMaj			1			1 (v1.6 v1.7)
+verMin			1			7
+{ v1.7
+	Field			Size		Comment
+	-----			----		-------
+	width			4			x size of the map (int)
+	height			4			y size of the map (int)
+	zoom			4			zoom, default 10.0f (float)
+	numTexture		4			number of textures (int)
+	maxTexName		4			maximum size of the texture names (int)
+	{ * numTexture
+		[ Texture ] sizeof=maxTexName
+		Field		Size			Comment
+		-----		----			-------
+		name		maxTexName		texture name (nul terminated string)
+	}
+	numLightmap		4			number of lightmaps
+	lmapWidth		4			??? lightmap x grid size (must be 8) (int)
+	lmapHeight		4			??? lightmap y grid size (must be 8) (int)
+	lmapPf			4			??? lightmap 'cells per grid'? (must be 1) (int)
+	{ v1.7
+		{ * numLightmap
+			[ CLMInfo ] sizeof=0x100
+			Field			Size		Comment
+			-----			----		-------
+			brightness		1*lmapWidth*lmapHeight		unsigned brightness values of the grid (must be 8x8) (uchar[8][8])
+			color			3*lmapWidth*lmapHeight		RGB/BGR(?) colors of the grid (must be 8x8) (uchar[3][8][8])
+		}
+	}
+	{ v1.6
+		{ * numLightmap
+			[ LMIndex ] sizeof=0x10
+			Field		Size		Comment
+			-----		----		-------
+			a			4			(ulong)
+			r			4			(ulong)
+			g			4			(ulong)
+			b			4			(ulong)
+		}
+		colorchannel		4		??? number of color channels? (int)
+		{ * colorchannel
+			[ ColorChannel ] sizeof=0x28
+			Field		Size		Comment
+			-----		----		-------
+			buffer		40			(uchar[40])
+		}
+	}
+	numSurface		4		number of surfaces
+	{ * numSurface
+		[ GndSurfaceFmt ] sizeof=0x28
+		Field			Size		Comment
+		-----			----		-------
+		u[0]			4			south west u texture coordinate (float)
+		u[1]			4			south east u texture coordinate (float)
+		u[2]			4			north west u texture coordinate (float)
+		u[3]			4			north east u texture coordinate (float)
+		v[0]			4			south west v texture coordinate (float)
+		v[1]			4			south east v texture coordinate (float)
+		v[2]			4			north west v texture coordinate (float)
+		v[3]			4			north east v texture coordinate (float)
+		textureId		2			texture index (-1 for noone) (short)
+		lightmapId		2			lightmap index (-1 for noone) (ushort)
+		color			4			color (COLOR bgra)
+	}
+	{ * width*height
+		{ v1.7
+			[ GndCellFmt17 ] sizeof=0x1C
+			Field				Size		Comment
+			-----				----		-------
+			height[0]			4			southWestDepth (float)
+			height[1]			4			southEastDepth (float)
+			height[2]			4			northWestDepth (float)
+			height[3]			4			northEastDepth (float)
+			topSurfaceId		4			top surface index (-1 for noone) (int)
+			frontSurfaceId		4			front surface index (-1 for noone) (int)
+			rightSurfaceId		4			right surface index (-1 for noone) (int)
+		}
+		{ v1.6
+			[ GndCellFmt16 ] sizeof=0x16
+			Field				Size		Comment
+			-----				----		-------
+			height[0]			4			southWestDepth (float)
+			height[1]			4			southEastDepth (float)
+			height[2]			4			northWestDepth (float)
+			height[3]			4			northEastDepth (float)
+			topSurfaceId		4			top surface index (-1 for noone) (short)
+			frontSurfaceId		4			front surface index (-1 for noone) (short)
+			rightSurfaceId		4			right surface index (-1 for noone) (short)
+		}
+	}
+}
+
+
+
+------------------------------------
+-- alpha ---------------------------
+------------------------------------
+[ Header ]
+
+Field			Size		Comment
+-----			----		-------
+numTexture		4			number of textures
+width			4			x size of the map
+height			4			y size of the map
+{ *numTexture
+	[ Texture ] sizeof=80
+	Field		Size		Comment
+	-----		----		-------
+	name		80			texture name
+}
+{ * width*height
+	[ Cell ] sizeof=0x84
+	Field				Size		Comment
+	-----				----		-------
+	texture_up			4			texture index (-1 for noone) (int)
+	texture_front		4			texture index (-1 for noone) (int)
+	texture_left		4			texture index (-1 for noone) (int)
+	height[0]			4			southWestDepth (float)
+	height[1]			4			southEastDepth (float)
+	height[2]			4			northWestDepth (float)
+	height[3]			4			northEastDepth (float)
+	color				4			color
+	u[0]				4			south west u texture coordinate (float)
+	u[1]				4			south east u texture coordinate (float)
+	u[2]				4			north west u texture coordinate (float)
+	u[3]				4			north east u texture coordinate (float)
+	v[0]				4			south west v texture coordinate (float)
+	v[1]				4			south east v texture coordinate (float)
+	v[2]				4			north west v texture coordinate (float)
+	v[3]				4			north east v texture coordinate (float)
+	???					68			???
+}

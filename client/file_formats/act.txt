@@ -1,0 +1,121 @@
+// (from ximosoft rolaboratory)
+// ACT : Action File
+// This file contains sequence of sprite animation.
+//
+// Action List File Format, this file contains how to display sprite to perform 
+// an action.
+--------------------------------------------------------------------------------
+
+[ Header ]
+Field			Size		Comment
+-----			----		-------
+id				2			"AC" (0x41 0x43) ushort
+ver				2			<= 0x205 (0x101? 0x200 0x201 0x203 0x204 0x205) ushort
+count			2			Number of actions (ushort)
+reserved		10			???
+{ * count
+	[ Action ]
+	Field			Size		Comment
+	-----			----		-------
+	numMotion		4			??? int
+	{ * numMotion
+		[ Motion ]
+		Field			Size		Comment
+		-----			----		-------
+		range1			16			??? RECT{left,top,right,bottom}
+		range2			16			??? RECT{left,top,right,bottom}
+		numSprite		4			Number of sprite clips (max=1000) (int)
+		{ * numSprite
+			// the width and height of the sprite image (affected by zoom) is used to compute the real x,y
+			// the x,y of the clip is the center of the sprite image (?)
+			{ >= v2.5
+				[ SpriteClip ] sizeof=0x30
+				Field			Size		Comment
+				-----			----		-------
+				x				4			offset in the frame (center is 0,0) (int)
+				y				4			offset in the frame (center is 0,0) (int)
+				sprIndex		4			Number of the image in the spr file (-1 for no image) (int)
+				flags			4			If non zero the image is mirrored along the vertical axis
+				color			4			RGBA color (for blending?) (default 0xFFFFFFFF)
+				zoomx			4			scale in the X axis (float) (default 1.0)
+				zoomy			4			scale in the Y axis (float) (default 1.0)
+				angle			4			angle/rotation (default 0)
+				clipType		4			0=palette image,1=rgb image (default 0)
+				wi				4			??? width // int
+				he				4			??? height // int
+			}
+			{ == v2.4
+				[ SpriteClip ] sizeof=0x24
+				Field			Size		Comment
+				-----			----		-------
+				x				4			offset in the frame (center is 0,0) (int)
+				y				4			offset in the frame (center is 0,0) (int)
+				sprIndex		4			Number of the image in the spr file (-1 for no image)
+				flags			4			If non zero the image is mirrored along the vertical axis
+				color			4			RGBA color (for blending?) (default 0xFFFFFFFF)
+				zoomx			4			scale in the X axis (float) (default 1.0)
+				zoomy			4			scale in the Y axis (float) (default 1.0)
+				angle			4			angle/rotation (default 0)
+				clipType		4			0=palette image,1=rgb image (default 0)
+			}
+			{ >= v2.0 && <= v2.3
+				[ SpriteClip ] sizeof=0x20
+				Field			Size		Comment
+				-----			----		-------
+				x				4			offset in the frame (center is 0,0) (int)
+				y				4			offset in the frame (center is 0,0) (int)
+				sprIndex		4			Number of the image in the spr file (-1 for no image)
+				flags			4			If non zero the image is mirrored along the vertical axis
+				color			4			RGBA color (for blending?) (default 0xFFFFFFFF)
+				zoom			4			scale of the image (float) (default 1.0)
+				angle			4			angle/rotation (default 0)
+				clipType		4			0=palette image,1=rgb image (default 0)
+			}
+			{ (v1.x)
+				[ SpriteClip ] sizeof=0x10
+				Field			Size		Comment
+				-----			----		-------
+				x				4			offset in the frame (center is 0,0) (int)
+				y				4			offset in the frame (center is 0,0) (int)
+				sprIndex		4			Number of the image in the spr file (-1 for no image)
+				flags			4			If non zero the image is mirrored along the vertical axis
+			}
+		}// end numSprite
+		{ >= v2.0 (set to -1 on v2.0)
+			Field		Size		Comment
+			-----		----		-------
+			eventId		4			event id (default -1)
+		}
+		{ >= v2.3
+			// TODO investigate. imf files are related to this data
+			Field					Size		Comment
+			-----					----		-------
+			numAttachPointInfo		4			??? number of anchors (default 0)
+			{ * numAttachPointInfo
+				Field		Size		Comment
+				-----		----		-------
+				???			4			??? ignored
+				x			4			??? offset in the frame (center is 0,0)
+				y			4			??? offset in the frame (center is 0,0)
+				attr		4			???
+			}
+		}
+	}// end numMotion
+}// end count
+{ >= v2.1
+	Field			Size		Comment
+	-----			----		-------
+	numEvent		4			number of events/sound files (default 0)
+	{ * numEvent
+		Field		Size		Comment
+		-----		----		-------
+		event		40			event ("atk") or pathname of sound file
+	}
+}
+{ >= v2.2
+	{ * count
+		Field		Size		Comment
+		-----		----		-------
+		delay		4			???  interval of action frames? (float) (default 4.0)
+	}// end count
+}

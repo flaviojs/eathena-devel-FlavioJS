@@ -1,0 +1,11 @@
+#rsxname "<filename>"
+#action <actNum>.i <motionSpeed>.i <startFrame>.i <endFrame>.i { <attackFrame>.i }.*
+#interiorzoom <interiorZoom>.f
+#interioroffsetx <interiorOffsetX>.i
+#interioroffsety <interiorOffsetY>.i
+#interiorframes <interiorStartFrame>.i <interiorEndFrame>.i
+#shadowzoom <shadowZoom>.f
+
+// line based format
+// there should be no duplicate actions (actNum)
+// #action references the last #rsxname
