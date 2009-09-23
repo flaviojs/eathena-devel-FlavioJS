@@ -1,0 +1,65 @@
+// (from ximosoft rolaboratory)
+// STR : Special Trail Resource File
+// Contains the sequence of special skills.
+//
+// Str, or Special Trail Resource as i name it, are files for effects, some 
+// skills and effects use this files, wich contains info about images and how 
+// to display it.
+--------------------------------------------------------------------------------
+// Effect animation
+
+
+
+[ Header ]
+Field			Size		Comment
+-----			----		-------
+sig				4			"STRM" (0x53 0x54 0x52 0x4D) (not checked)
+ver				4			(ulong) 148 (0x94)
+cFrame			4			(int) Number of frames?
+nFPS			4			(int) Frames per second
+cLayer			4			(int) Number of layers?
+reserved		16			???
+{ * cLayer
+	[ Layer ]
+	Field		Size		Comment
+	-----		----		-------
+	cTex		4			Number of textures? (int)
+	{ * cTex
+		Field		Size		Comment
+		-----		----		-------
+		texName		128			(char[128]) Texture pathname (defaults to "1.bmp")
+	}
+	cAniKey		4			Number of animation key frames? (int)
+	{ * cAniKey
+		[ Key Frame ] // sizeof = 0x7C
+		Field			Size		Comment
+		-----			----		-------
+		iFrame			4			(int)
+		dwType			4			(ulong)
+		x				4			(float)
+		y				4			(float)
+		u				4			(float)
+		v				4			(float)
+		us				4			(float)
+		vs				4			(float)
+		u2				4			(float)
+		v2				4			(float)
+		us2				4			(float)
+		uv2				4			(float)
+		ax				4*4			(float[4])
+		ay				4*4			(float[4])
+		aniframe		4			(float)
+		anitype			4			(ulong)
+		anidelta		4			(float)
+		rz				4			(float)
+		crR				4			(float)
+		crG				4			(float)
+		crB				4			(float)
+		crA				4			(float)
+		srcalpha		4			(ulong)
+		destalpha		4			(ulong)
+		mtpreset		4			(ulong)
+	}
+}
+
+// client can handle: 60 layers, 110 textures per layer

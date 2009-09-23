@@ -1,0 +1,195 @@
+// (from ximosoft rolaboratory)
+// RSW : Resource World File
+// Contains all models, lights, effects and sounds of the map.
+//
+// Resource World, it’s a file that contains how a map is structured. It has a 
+// header, and then starts objects list, first an integer to design the model 
+// type, and then series of that (integer+object).
+--------------------------------------------------------------------------------
+// World
+// Versions:
+// 1.2 - base version
+// 1.3 - waterLevel added to header; name, animType animSpeed, blockType added to model object
+// 1.4 - attrFile added to header
+// 1.5 - lightLongitude, lightLatitude, diffuseCol, ambientCol added to header
+// 1.6 - groundTop, groundBottom, groundLeft, groundRight added to header
+// 1.7 - unknown float added to header
+// 1.8 - waterType, waveHeight, waveSpeed, wavePitch added to header
+// 1.9 - waterAnimSpeed added to header
+// 2.0 - cycle added to sound source object
+// 2.1 - quadtree added
+
+
+
+[ Header ]
+Field			Size		Comment
+-----			----		-------
+magic			4			"GRSW" (0x47 0x52 0x53 0x57)
+verMajor		1			(uchar) major version
+verMinor		1			(uchar) minor version
+iniFile			40			(char[40]) ini file (ignored, used by alpha clients?)
+gndFile			40			(char[40]) gnd file
+{ >= v1.4
+	Field			Size		Comment
+	-----			----		-------
+	attrFile		40			(char[40]) gat file
+}
+scrFile			40			(char[40]) scr file (used by alpha clients?)
+{ >= v1.3
+	Field			Size		Comment
+	-----			----		-------
+	waterLevel		4			(float) (default ?)
+}
+{ >= v1.8
+	Field			Size		Comment
+	-----			----		-------
+	waterType		4			(int) (default 0)
+	waveHeight		4			(float) (default 1.0)
+	waveSpeed		4			(float) (default 2.0)
+	wavePitch		4			(float) (default 50.0)
+}
+{ >= v1.9
+	Field				Size		Comment
+	-----				----		-------
+	waterAnimSpeed		4			(int) (default 3)
+}
+{ >= v1.5
+	Field				Size		Comment
+	-----				----		-------
+	lightLongitude		4			(int) angle in degrees (default 45)
+	lightLatitude		4			(int) angle in degrees (default 45)
+	diffuseCol			12			(vector3d) (default vector3d(1,1,1))
+	ambientCol			12			(vector3d) (default vector3d(0.3,0.3,0.3))
+}
+{ >= v1.7
+	Field		Size		Comment
+	-----		----		-------
+	???			4			(float) (ignored)
+}
+{ >= v1.6
+	Field				Size		Comment
+	-----				----		-------
+	groundTop			4			(int) (default -500)
+	groundBottom		4			(int) (default 500)
+	groundLeft			4			(int) (default -500)
+	groundRight			4			(int) (default 500)
+}
+[ World Objects ]
+len				4			(int) number of objects
+{ * len
+	Field		Size		Comment
+	-----		----		-------
+	type		4			(int) object type
+	{ type == 1
+		{ >= v1.3
+			[ Model ]
+			Field			Size		Comment
+			-----			----		-------
+			name			40			(char[40])
+			animType		4			(int) (default 0)
+			animSpeed		4			(float) (default 1.0, must be in range [0,100.0[)
+			blockType		4			(int) (default 0)
+			modelName		80			(char[80])
+			nodeName		80			(char[80])
+			pos				12			(vector3d)
+			rot				12			(vector3d)
+			scale			12			(vector3d)
+		}
+		{ < v1.3
+			[ Model ]
+			Field			Size		Comment
+			-----			----		-------
+			modelName		80			(char[80])
+			nodeName		80			(char[80])
+			pos				12			(vector3d)
+			rot				12			(vector3d)
+			scale			12			(vector3d)
+		}
+	}
+	{ type == 2
+		[ Light Source ] (data is ignored)
+		Field		Size		Comment
+		-----		----		-------
+		name		80			(char[80])
+		pos			12			(vector3d)
+		red			4			(int)
+		green		4			(int)
+		blue		4			(int)
+		range		4			(float)
+	}
+	{ type == 3
+		{ >= v2.0
+			[ Sound Source ]
+			Field			Size		Comment
+			-----			----		-------
+			name			80			(char[80])
+			waveName		80			(char[80])
+			pos				12			(vector3d)
+			vol				4			(float)
+			width			4			(int)
+			height			4			(int)
+			range			4			(float)
+			cycle			4			(float) (default 4.0)
+		}
+		{ < v2.0
+			[ Sound Source ]
+			Field			Size		Comment
+			-----			----		-------
+			name			80			(char[80])
+			waveName		80			(char[80])
+			pos				12			(vector3d)
+			vol				4			(float)
+			width			4			(int)
+			height			4			(int)
+			range			4			(float)
+		}
+	}
+	{ type == 4
+		[ Effect Source ]
+		Field			Size		Comment
+		-----			----		-------
+		name			80			(char[80])
+		pos				12			(vector3d)
+		type			4			(int)
+		emitSpeed		4			(float)
+		param			16			(float[4])
+	}
+}
+{ >= v2.1
+	[ QuadTree ]
+	{ * 1365 (4^0 + 4^1 + 4^2 + 4^3 + 4^4 + 4^5, quadtree with 6 levels, depth-first ordering)
+		[ QuadTreeNode ]
+		Field			Size		Comment
+		-----			----		-------
+		max				12			(vector3d)
+		min				12			(vector3d)
+		halfSize		12			(vector3d)
+		center			12			(vector3d)
+	}
+}
+
+// ------------------------------------------------------------------
+// ------------------------------------------------------------------
+// ------------------------------------------------------------------
+
+struct matrix {float v11,v12,v13,v21,v22,v23,v31,v32,v33,v41,v42,v43;}
+struct vector3d {float x,y,z;}
+
+Object type:
+1 - Model
+2 - Light Source
+3 - Sound Source
+4 - Effect Source
+
+// if lightmaps are enabled: (on load)
+ambientCol *= 1.5;
+if( ambientCol.x > 1.0 ) ambientCol.x = 1.0;
+if( ambientCol.y > 1.0 ) ambientCol.y = 1.0;
+if( ambientCol.z > 1.0 ) ambientCol.z = 1.0;
+
+
+// calculating light direction:
+matrix r;
+r.make_X_rotation(lightLatiture*pi/180.0);
+r.append_Y_rotation(lightLongitude*pi/180.0);// multiplies itself with a Y rotation matrix
+vector3d lightDir(r.v21+r.v41, r.v22+r.v42, r.v23+r.v43);
