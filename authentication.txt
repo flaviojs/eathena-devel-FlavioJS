@@ -52,6 +52,24 @@ Char-server:
 Map-server:
 	Receives client sessions from the char-server.
 
+Changing map-server:
+	1) ...(normal play) (client session owned by map-server1)
+	2) Player enters a map that is in map-server2.
+	3) Map-server1 sends save data to char-server and receives an ack.
+	4) Map-server1 sends client session to map-server2 via char-server and receives a reply.
+	5.a) [if failed] Player is sent to save point. (client session owned by map-server1)
+	5.b) [if ok] (client session owned by map-server2)
+	5.b.1) Map-server1 sends change map server to client.
+	5.b.2) Client disconnects. (to map-server2)
+
+Character select:
+	1) ...(normal play) (client session owned by map-server)
+	2) Client requests character select.
+	3) Map-server sends final save data to char-server and receives an ack.
+	4) Map-server sends client session to char-server and receives an ack. (client session owned by char-server)
+	5) Map-server sends character select ok to client.
+	6) Client disconnects. (to char-server)
+
 
 ==========================================================================
  Client Authentication
@@ -64,33 +82,37 @@ Login-server:
 	2.b.1) Client requests hash key (password salt) from login-server.
 	2.b.2) Login-server replies with new hash key to client.
 	2.b.3) Client sends username and hashed password to login-server.
-	3.a) [if auth failed] Login-server rejects client.
+	3.a) [if auth failed] Login-server rejects client and client disconnects. (END)
 	3.b) [if auth ok]:
-	3.b.a) [if client session owned by a char-server] Login-server rejects client and requests kick from char-server.
+	3.b.a) [if client session owned by a char-server] Login-server requests kick from char-server and rejects client and client disconnects. (END)
 	3.b.b) [else]:
 	3.b.b.1) Login-server (re)creates client session with new login_id1/login_id2. (client session owned by login-server)
 	3.b.b.2) Login-server sends account_id, login_id1, login_id2, sex and list of servers to client.
-	4) Client disconnects. (server selection is done offline)
+	4) Client disconnects. (server selection is done offline; to char-server)
 
 Char-server:
 	1) Client connects to char-server.
 	2) Client sends account_id, login_id1, login_id2 and sex to char-server.
-	3) Char-server sends account_id, login_id1, login_id2 and sex to login-server. (request client session)
-	4.a) [if client session matches and not owned by another char-server] Login-server replies auth ok to char-server. (client session owned by char-server)
-	4.b) [else] Login-server replies auth failed to char-server.
-	5.a) [if auth failed] Char-server rejects client.
+	3.a) [if client session exists] (from map-server; character select)
+	3.a.1) [if client session matches] Auth ok.
+	3.a.b) [else]: Auth failed.
+	3.b) [else]: (from login-server; after server selection)
+	3.b.1) Char-server sends account_id, login_id1, login_id2 and sex to login-server. (request client session)
+	3.b.2.a) [if client session matches and not owned by another char-server] Login-server replies auth ok to char-server. (client session owned by char-server)
+	4.b.2.b) [else] Login-server replies auth failed to char-server.
+	5.a) [if auth failed] Char-server rejects client and client disconnects. (END)
 	5.b) [if auth ok]:
-	5.b.a) [if client session owned by a map-server] Char-server rejects client and requests kick from map-server.
-	5.b.b) [if client session exists] Char-server rejects client.
-	5.b.c) [else]:
-	5.b.c.1) Char-server creates a client session with invalid char_id. (client session owned by char-server)
-	5.b.c.2) Char-server sends list of characters to client.
-	5.b.c.3) ...
-	5.b.c.4) Client sends selected character to char-server.
-	5.b.c.5) Char-server updates client session. (if another character selection is received, the client is kicked and the session is released)
-	5.b.c.6) Char-server sends client session to target map-server and receives an ack. (client session owned by map-server)
-	5.b.c.8) Char-server sends char_id, mapname and map-server address to client.
-	6) Client disconnects.
+	5.b.a) [if client session owned by a map-server] Char-server requests kick from map-server and rejects client and client disconnects. (END)
+	5.b.b) [if client session has a client attached] Char-server kicks other client, rejects client and client disconnects. (END)
+	5.b.c) [if client session doesn't exist] Char-server creates a client session. (client session owned by char-server)
+	6) Char-server sets an invalid char_id and attaches the client to the client session.
+	7) Char-server sends list of characters to client.
+	8) ...
+	9) Client sends character selection to char-server.
+	10) Char-server updates client session. (if another selection is received, the client is kicked and the session is released)
+	11) Char-server sends client session to target map-server and receives an ack. (client session owned by map-server)
+	12) Char-server sends char_id, mapname and map-server address to client.
+	13) Client disconnects. (to map-server)
 
 Map-server:
 	1) Client connects to map-server.
