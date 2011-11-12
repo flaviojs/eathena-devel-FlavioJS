@@ -123,13 +123,13 @@ len				4			(int) number of objects
 			Field			Size		Comment
 			-----			----		-------
 			name			80			(char[80])
-			waveName		80			(char[80])
-			pos				12			(vector3d)
-			vol				4			(float)
-			width			4			(int)
-			height			4			(int)
-			range			4			(float)
-			cycle			4			(float) (default 4.0)
+			waveName		80			(char[80]) wave filename
+			pos				12			(vector3d) origin of the sound
+			vol				4			(float) volume of the sound
+			width			4			(int) size of the sound object
+			height			4			(int) size of the sound object
+			range			4			(float) range of the sound
+			cycle			4			(float) (default 4.0) (seconds)
 		}
 		{ < v2.0
 			[ Sound Source ]

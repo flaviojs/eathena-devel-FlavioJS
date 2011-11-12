@@ -15,15 +15,15 @@ Field			Size		Comment
 -----			----		-------
 sig				4			"STRM" (0x53 0x54 0x52 0x4D) (not checked)
 ver				4			(ulong) 148 (0x94)
-cFrame			4			(int) Number of frames?
+cFrame			4			(int) Number of frames
 nFPS			4			(int) Frames per second
-cLayer			4			(int) Number of layers?
+cLayer			4			(int) Number of layers
 reserved		16			???
 { * cLayer
 	[ Layer ]
 	Field		Size		Comment
 	-----		----		-------
-	cTex		4			Number of textures? (int)
+	cTex		4			Number of textures (int)
 	{ * cTex
 		Field		Size		Comment
 		-----		----		-------
@@ -34,10 +34,10 @@ reserved		16			???
 		[ Key Frame ] // sizeof = 0x7C
 		Field			Size		Comment
 		-----			----		-------
-		iFrame			4			(int)
-		dwType			4			(ulong)
-		x				4			(float)
-		y				4			(float)
+		iFrame			4			(int) Frame number. (there can be multiple keyframes for a single frame)
+		dwType			4			(ulong) Keyframe type. 0 - set values; 1/other - add to previous data (x,y,u,v,us,vs,u2,v2,us2,vs2,ax,ay,rz,crR,crG,crB,crA,aniframe depends on anitype)
+		x				4			(float) (320 is the origin?)
+		y				4			(float) (240 is the origin?)
 		u				4			(float)
 		v				4			(float)
 		us				4			(float)
@@ -45,21 +45,223 @@ reserved		16			???
 		u2				4			(float)
 		v2				4			(float)
 		us2				4			(float)
-		uv2				4			(float)
-		ax				4*4			(float[4])
-		ay				4*4			(float[4])
-		aniframe		4			(float)
-		anitype			4			(ulong)
+		vs2				4			(float)
+		ax				4*4			(float[4]) Vertice coordinates.
+		ay				4*4			(float[4]) Vertice coordinates.
+		aniframe		4			(float) Texture id.
+		anitype			4			(ulong) Determines how aniframe changes for dwType != 0.
 		anidelta		4			(float)
-		rz				4			(float)
-		crR				4			(float)
-		crG				4			(float)
-		crB				4			(float)
-		crA				4			(float)
-		srcalpha		4			(ulong)
-		destalpha		4			(ulong)
-		mtpreset		4			(ulong)
+		rz				4			(float) Rotation. [0,1024[ is equivalent to [0,360[ degrees.
+		crR				4			(float) Red. [0,255]
+		crG				4			(float) Green. [0,255]
+		crB				4			(float) Blue. [0,255]
+		crA				4			(float) Alpha. [0,255]
+		srcalpha		4			(ulong) Source blend mode. (D3DBLEND_*)
+		destalpha		4			(ulong) Destination blend mode. (D3DBLEND_*)
+		mtpreset		4			(ulong) Multi-texture mode.
 	}
 }
 
 // client can handle: 60 layers, 110 textures per layer
+//-------------------------------------------------------------------
+/* anitype : determines how aniframe changes for dwType != 0
+0/other - No change.
+1 - Add aniframe.  //  ]-inf,inf[
+	aniframe += keyframe.aniframe;
+2 - Add anidelta, stop on limit.  //  ]-inf,ROStrLayer.texturecount[
+	aniframe += keyframe.anidelta;
+	if (aniframe >= ROStrLayer.texturecount)
+		aniframe = ROStrLayer.texturecount - 1.0f;
+3 - Add anidelta, loops when over.  //  [0.0,ROStrLayer.texturecount[
+	aniframe += keyframe.anidelta;
+	if (aniframe >= ROStrLayer.texturecount)
+		aniframe -= (float)(int)(aniframe / ROStrLayer.texturecount) * ROStrLayer.texturecount;
+4 - Subtract anidelta, loops when under.  //  [0.0,ROStrLayer.texturecount[ // WARNING broken on 2004 client (TODO check a recent client)
+	aniframe -= keyframe.anidelta;
+	if (aniframe < 0.0f)
+		aniframe -= (float)(int)(aniframe / ROStrLayer.texturecount) * ROStrLayer.texturecount;
+5 - TODO add anidelta per frame?
+*/
+//-------------------------------------------------------------------
+/* mtpreset : multi-texture mode, set when drawing the quad
+0 - TODO interpret
+	SetTextureStage(0, D3DTSS_TEXCOORDINDEX, 0)
+	SetTextureStage(0, D3DTSS_COLORARG1,     D3DTA_TEXTURE)
+	SetTextureStage(0, D3DTSS_COLOROP,       D3DTOP_MODULATE)
+	SetTextureStage(0, D3DTSS_COLORARG2,     0)
+	SetTextureStage(0, D3DTSS_ALPHAARG1,     D3DTA_TEXTURE)
+	SetTextureStage(0, D3DTSS_ALPHAOP,       D3DTOP_MODULATE)
+	SetTextureStage(0, D3DTSS_ALPHAARG2,     0)
+	SetTextureStage(1, D3DTSS_COLOROP,       D3DTOP_DISABLE)
+	SetTextureStage(1, D3DTSS_ALPHAOP,       D3DTOP_DISABLE)
+1 - TODO interpret
+	SetTextureStage(0, D3DTSS_TEXCOORDINDEX, 0)
+	SetTextureStage(0, D3DTSS_COLORARG1,     D3DTA_TEXTURE)
+	SetTextureStage(0, D3DTSS_COLOROP,       D3DTOP_MODULATE)
+	SetTextureStage(0, D3DTSS_COLORARG2,     0)
+	SetTextureStage(0, D3DTSS_ALPHAARG1,     D3DTA_TEXTURE)
+	SetTextureStage(0, D3DTSS_ALPHAOP,       D3DTOP_SELECTARG1)
+	SetTextureStage(1, D3DTSS_COLOROP,       D3DTOP_DISABLE)
+	SetTextureStage(1, D3DTSS_ALPHAOP,       D3DTOP_DISABLE)
+2 - same as 1
+3 - TODO interpret
+	SetTextureStage(0, D3DTSS_TEXCOORDINDEX, 0)
+	SetTextureStage(0, D3DTSS_COLORARG1,     D3DTA_TEXTURE)
+	SetTextureStage(0, D3DTSS_COLOROP,       D3DTOP_ADD)
+	SetTextureStage(0, D3DTSS_COLORARG2,     0)
+	SetTextureStage(0, D3DTSS_ALPHAOP,       D3DTOP_SELECTARG2)
+	SetTextureStage(0, D3DTSS_ALPHAARG2,     0)
+	SetTextureStage(1, D3DTSS_COLOROP,       D3DTOP_DISABLE)
+	SetTextureStage(1, D3DTSS_ALPHAOP,       D3DTOP_DISABLE)
+4 - TODO interpret
+	SetTextureStage(0, D3DTSS_TEXCOORDINDEX, 0)
+	SetTextureStage(0, D3DTSS_COLORARG1,     D3DTA_TEXTURE)
+	SetTextureStage(0, D3DTSS_COLOROP,       D3DTOP_BLENDTEXTUREALPHA)
+	SetTextureStage(0, D3DTSS_COLORARG2,     0)
+	SetTextureStage(0, D3DTSS_ALPHAOP,       D3DTOP_SELECTARG2)
+	SetTextureStage(0, D3DTSS_ALPHAARG2,     0)
+	SetTextureStage(1, D3DTSS_COLOROP,       D3DTOP_DISABLE)
+	SetTextureStage(1, D3DTSS_ALPHAOP,       D3DTOP_DISABLE)
+5 - TODO interpret
+	SetTextureStage(0, D3DTSS_TEXCOORDINDEX, 0)
+	SetTextureStage(0, D3DTSS_COLORARG1,     D3DTA_TEXTURE)
+	SetTextureStage(0, D3DTSS_COLOROP,       D3DTOP_MODULATE)
+	SetTextureStage(0, D3DTSS_COLORARG2,     0)
+	SetTextureStage(0, D3DTSS_ALPHAOP,       D3DTOP_SELECTARG2)
+	SetTextureStage(0, D3DTSS_ALPHAARG2,     0)
+	SetTextureStage(1, D3DTSS_TEXCOORDINDEX, 1)
+	SetTextureStage(1, D3DTSS_COLORARG1,     D3DTA_TEXTURE)
+	SetTextureStage(1, D3DTSS_COLOROP,       D3DTOP_MODULATE)
+	SetTextureStage(1, D3DTSS_COLORARG2,     D3DTA_CURRENT)
+	SetTextureStage(1, D3DTSS_ALPHAARG1,     D3DTA_TEXTURE)
+	SetTextureStage(1, D3DTSS_ALPHAOP,       D3DTOP_SELECTARG1)
+6 - TODO interpret
+	SetTextureStage(0, D3DTSS_TEXCOORDINDEX, 0)
+	SetTextureStage(0, D3DTSS_COLORARG1,     D3DTA_COMPLEMENT|D3DTA_TEXTURE)
+	SetTextureStage(0, D3DTSS_COLOROP,       D3DTOP_MODULATE)
+	SetTextureStage(0, D3DTSS_COLORARG2,     0)
+	SetTextureStage(0, D3DTSS_ALPHAOP,       D3DTOP_SELECTARG2)
+	SetTextureStage(0, D3DTSS_ALPHAARG2,     0)
+	SetTextureStage(1, D3DTSS_TEXCOORDINDEX, 1)
+	SetTextureStage(1, D3DTSS_COLORARG1,     D3DTA_COMPLEMENT|D3DTA_TEXTURE)
+	SetTextureStage(1, D3DTSS_COLOROP,       D3DTOP_MODULATE)
+	SetTextureStage(1, D3DTSS_COLORARG2,     D3DTA_CURRENT)
+	SetTextureStage(1, D3DTSS_ALPHAARG1,     D3DTA_TEXTURE)
+	SetTextureStage(1, D3DTSS_ALPHAOP,       D3DTOP_SELECTARG1)
+7 - TODO interpret
+	SetTextureStage(0, D3DTSS_TEXCOORDINDEX, 0)
+	SetTextureStage(0, D3DTSS_COLORARG1,     D3DTA_TEXTURE)
+	SetTextureStage(0, D3DTSS_COLOROP,       D3DTOP_SELECTARG1)
+	SetTextureStage(0, D3DTSS_ALPHAARG1,     D3DTA_TEXTURE)
+	SetTextureStage(0, D3DTSS_ALPHAOP,       D3DTOP_SELECTARG1)
+	SetTextureStage(1, D3DTSS_TEXCOORDINDEX, 1)
+	SetTextureStage(1, D3DTSS_COLORARG1,     D3DTA_ALPHAREPLICATE|D3DTA_TEXTURE)
+	SetTextureStage(1, D3DTSS_COLOROP,       D3DTOP_MODULATE)
+	SetTextureStage(1, D3DTSS_COLORARG2,     D3DTA_CURRENT)
+	SetTextureStage(1, D3DTSS_ALPHAARG1,     D3DTA_TEXTURE)
+	SetTextureStage(1, D3DTSS_ALPHAOP,       D3DTOP_SELECTARG1)
+8 - TODO interpret
+	SetTextureStage(0, D3DTSS_TEXCOORDINDEX, 0)
+	SetTextureStage(0, D3DTSS_COLORARG1,     D3DTA_TEXTURE)
+	SetTextureStage(0, D3DTSS_COLOROP,       D3DTOP_MODULATE)
+	SetTextureStage(0, D3DTSS_COLORARG2,     0)
+	SetTextureStage(0, D3DTSS_ALPHAARG1,     D3DTA_TEXTURE)
+	SetTextureStage(0, D3DTSS_ALPHAOP,       D3DTOP_SELECTARG1)
+	SetTextureStage(1, D3DTSS_TEXCOORDINDEX, 1)
+	SetTextureStage(1, D3DTSS_COLORARG1,     D3DTA_TEXTURE)
+	SetTextureStage(1, D3DTSS_COLOROP,       D3DTOP_ADD)
+	SetTextureStage(1, D3DTSS_COLORARG2,     D3DTA_CURRENT)
+	SetTextureStage(1, D3DTSS_ALPHAARG1,     D3DTA_TEXTURE)
+	SetTextureStage(1, D3DTSS_ALPHAOP,       D3DTOP_SELECTARG1)
+9 - TODO interpret
+	SetTextureStage(0, D3DTSS_TEXCOORDINDEX, 0)
+	SetTextureStage(0, D3DTSS_COLORARG1,     D3DTA_TEXTURE)
+	SetTextureStage(0, D3DTSS_COLOROP,       D3DTOP_MODULATE)
+	SetTextureStage(0, D3DTSS_COLORARG2,     0)
+	SetTextureStage(0, D3DTSS_ALPHAOP,       D3DTOP_SELECTARG2)
+	SetTextureStage(0, D3DTSS_ALPHAARG2,     0)
+	SetTextureStage(1, D3DTSS_TEXCOORDINDEX, 1)
+	SetTextureStage(1, D3DTSS_COLORARG1,     D3DTA_TEXTURE)
+	SetTextureStage(1, D3DTSS_COLOROP,       D3DTOP_BLENDTEXTUREALPHA)
+	SetTextureStage(1, D3DTSS_COLORARG2,     D3DTA_CURRENT)
+	SetTextureStage(1, D3DTSS_ALPHAARG1,     D3DTA_TEXTURE)
+	SetTextureStage(1, D3DTSS_ALPHAOP,       D3DTOP_SELECTARG1)
+10 - TODO interpret
+	SetTextureStage(0, D3DTSS_TEXCOORDINDEX, 0)
+	SetTextureStage(0, D3DTSS_COLORARG1,     D3DTA_TEXTURE)
+	SetTextureStage(0, D3DTSS_COLOROP,       D3DTOP_MODULATE)
+	SetTextureStage(0, D3DTSS_COLORARG2,     0)
+	SetTextureStage(0, D3DTSS_ALPHAOP,       D3DTOP_SELECTARG2)
+	SetTextureStage(0, D3DTSS_ALPHAARG2,     0)
+	SetTextureStage(1, D3DTSS_TEXCOORDINDEX, 1)
+	SetTextureStage(1, D3DTSS_COLORARG1,     D3DTA_TEXTURE)
+	SetTextureStage(1, D3DTSS_COLOROP,       D3DTOP_BLENDDIFFUSEALPHA)
+	SetTextureStage(1, D3DTSS_COLORARG2,     D3DTA_CURRENT)
+	SetTextureStage(1, D3DTSS_ALPHAARG1,     D3DTA_TEXTURE)
+	SetTextureStage(1, D3DTSS_ALPHAOP,       D3DTOP_SELECTARG1)
+11 - TODO interpret
+	SetTextureStage(0, D3DTSS_TEXCOORDINDEX, 0)
+	SetTextureStage(0, D3DTSS_COLORARG1,     D3DTA_TEXTURE)
+	SetTextureStage(0, D3DTSS_COLOROP,       D3DTOP_MODULATE)
+	SetTextureStage(0, D3DTSS_COLORARG2,     0)
+	SetTextureStage(0, D3DTSS_ALPHAOP,       D3DTOP_SELECTARG2)
+	SetTextureStage(0, D3DTSS_ALPHAARG2,     0)
+	SetTextureStage(1, D3DTSS_TEXCOORDINDEX, 1)
+	SetTextureStage(1, D3DTSS_COLORARG1,     D3DTA_TEXTURE)
+	SetTextureStage(1, D3DTSS_COLOROP,       D3DTOP_ADD)
+	SetTextureStage(1, D3DTSS_COLORARG2,     D3DTA_CURRENT)
+	SetTextureStage(1, D3DTSS_ALPHAARG1,     D3DTA_TEXTURE)
+	SetTextureStage(1, D3DTSS_ALPHAOP,       D3DTOP_SELECTARG1)
+12 - TODO interpret
+	SetTextureStage(0, D3DTSS_TEXCOORDINDEX, 0)
+	SetTextureStage(0, D3DTSS_COLORARG1,     D3DTA_TEXTURE)
+	SetTextureStage(0, D3DTSS_COLOROP,       D3DTOP_MODULATE)
+	SetTextureStage(0, D3DTSS_COLORARG2,     0)
+	SetTextureStage(0, D3DTSS_ALPHAOP,       D3DTOP_SELECTARG2)
+	SetTextureStage(0, D3DTSS_ALPHAARG2,     0)
+	SetTextureStage(1, D3DTSS_TEXCOORDINDEX, 1)
+	SetTextureStage(1, D3DTSS_COLORARG1,     D3DTA_COMPLEMENT|D3DTA_TEXTURE)
+	SetTextureStage(1, D3DTSS_COLOROP,       D3DTOP_ADD)
+	SetTextureStage(1, D3DTSS_COLORARG2,     D3DTA_CURRENT)
+	SetTextureStage(1, D3DTSS_ALPHAARG1,     D3DTA_TEXTURE)
+	SetTextureStage(1, D3DTSS_ALPHAOP,       D3DTOP_SELECTARG1)
+13 - TODO interpret
+	SetTextureStage(0, D3DTSS_TEXCOORDINDEX, 0)
+	SetTextureStage(0, D3DTSS_COLORARG1,     D3DTA_TEXTURE)
+	SetTextureStage(0, D3DTSS_COLOROP,       D3DTOP_ADD)
+	SetTextureStage(0, D3DTSS_COLORARG2,     0)
+	SetTextureStage(0, D3DTSS_ALPHAARG1,     D3DTA_TEXTURE)
+	SetTextureStage(0, D3DTSS_ALPHAOP,       D3DTOP_SELECTARG1)
+	SetTextureStage(1, D3DTSS_TEXCOORDINDEX, 1)
+	SetTextureStage(1, D3DTSS_COLORARG1,     D3DTA_TEXTURE)
+	SetTextureStage(1, D3DTSS_COLOROP,       D3DTOP_MODULATE)
+	SetTextureStage(1, D3DTSS_COLORARG2,     D3DTA_CURRENT)
+	SetTextureStage(1, D3DTSS_ALPHAARG1,     D3DTA_TEXTURE)
+	SetTextureStage(1, D3DTSS_ALPHAOP,       D3DTOP_SELECTARG1)
+14 - TODO interpret
+	SetTextureStage(0, D3DTSS_TEXCOORDINDEX, 0)
+	SetTextureStage(0, D3DTSS_COLORARG1,     D3DTA_TEXTURE)
+	SetTextureStage(0, D3DTSS_COLOROP,       D3DTOP_MODULATE)
+	SetTextureStage(0, D3DTSS_COLORARG2,     0)
+	SetTextureStage(0, D3DTSS_ALPHAOP,       D3DTOP_SELECTARG2)
+	SetTextureStage(0, D3DTSS_ALPHAARG2,     0)
+	SetTextureStage(1, D3DTSS_TEXCOORDINDEX, 1)
+	SetTextureStage(1, D3DTSS_COLORARG1,     D3DTA_TEXTURE)
+	SetTextureStage(1, D3DTSS_COLOROP,       D3DTOP_MODULATE2X)
+	SetTextureStage(1, D3DTSS_COLORARG2,     D3DTA_CURRENT)
+	SetTextureStage(1, D3DTSS_ALPHAARG1,     D3DTA_TEXTURE)
+	SetTextureStage(1, D3DTSS_ALPHAOP,       D3DTOP_SELECTARG1)
+15 - TODO interpret
+	SetTextureStage(0, D3DTSS_TEXCOORDINDEX, 0)
+	SetTextureStage(0, D3DTSS_COLORARG1,     D3DTA_TEXTURE)
+	SetTextureStage(0, D3DTSS_COLOROP,       D3DTOP_MODULATE)
+	SetTextureStage(0, D3DTSS_COLORARG2,     0)
+	SetTextureStage(0, D3DTSS_ALPHAOP,       D3DTOP_SELECTARG2)
+	SetTextureStage(0, D3DTSS_ALPHAARG2,     0)
+	SetTextureStage(1, D3DTSS_TEXCOORDINDEX, 1)
+	SetTextureStage(1, D3DTSS_COLORARG1,     D3DTA_TEXTURE)
+	SetTextureStage(1, D3DTSS_COLOROP,       D3DTOP_ADDSIGNED)
+	SetTextureStage(1, D3DTSS_COLORARG2,     D3DTA_CURRENT)
+	SetTextureStage(1, D3DTSS_ALPHAARG1,     D3DTA_TEXTURE)
+	SetTextureStage(1, D3DTSS_ALPHAOP,       D3DTOP_SELECTARG1)
+*/
