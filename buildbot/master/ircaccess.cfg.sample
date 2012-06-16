@@ -1,0 +1,40 @@
+# Command access file for the IRC bot (ircaccess.cfg).
+# Checks access in the following order:
+#  1) nickname.command
+#  2) nickname.*
+#  3) *.command
+#  4) *.*
+# Nicknames and commands are case insensitive and must be unique.
+# For unknown users only *.command and *.* is considered.
+# For named users access will only be granted if the nickname is registered and authenticated (checked with Nickserv).
+{
+	"*": { # unknown user
+		# default
+		"*": False,
+
+		# silly
+		"dance": True,
+		"destroy": True,
+		"hello": True,
+
+		# information
+		"commands": True,
+		"help": True,
+		"last": True,
+		"list": True,
+		"source": True,
+		"status": True,
+		"version": True,
+
+		# action
+		"force": False,
+		"mute": False,
+		"notify": False,
+		"reload": False,
+		"stop": False,
+		"unmute": False,
+		"watch": False,
+	},
+# Example: named user that has access to everything
+#	"flaviojs": {"*": True},
+}
