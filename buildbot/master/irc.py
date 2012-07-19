@@ -127,9 +127,9 @@ class ExtendedIrcStatusBot(IrcStatusBot):
 		if self.access.has_key(user):
 			userAccess = self.access[user]
 			def checkRegistered(_, self, user):
-				"""Checks if the user is registered.
-				Returns contact,True if registered.
-				Returns contact,False in not registered.
+				"""Checks if the user is registered and authenticated.
+				Returns contact,True if registered and authenticated.
+				Returns contact,False in not registered adn authenticated.
 				Returns contact,None if interrupted.
 				"""
 				if self.access_deferred.has_key(user):
@@ -139,7 +139,7 @@ class ExtendedIrcStatusBot(IrcStatusBot):
 				self.msg("Nickserv", "STATUS %s" % user)
 				return d
 			def deferredAccess():
-				"""When called, starts checking if a user is registered."""
+				"""When the deferred is called, starts checking if a user is registered and authenticated."""
 				d = defer.Deferred()
 				d.addCallback(checkRegistered, self, user)
 				return d
@@ -226,7 +226,7 @@ class ExtendedIrcStatusFactory(IrcStatusFactory):
 class ExtendedIRC(IRC):
 	"""Extended IRC class.
 	Changes:
-	 1) use ExtendedIrcStatusBot for the protocol class
+	 1) use ExtendedIrcStatusBot for the factory class
 	"""
 	factory = ExtendedIrcStatusFactory
 	
@@ -234,7 +234,7 @@ class ExtendedIRC(IRC):
 			allowForce=False, categories=None, password=None, notify_events={},
 			noticeOnChannel = False, showBlameList = True, useRevisions=False,
 			useSSL=False, lostDelay=None, failedDelay=None, useColors=True):
-		# XXX replace method - use class factory variable
+		# XXX replace method - use class in the factory variable
 		StatusReceiverMultiService.__init__(self)
 		
 		assert allowForce in (True, False)
